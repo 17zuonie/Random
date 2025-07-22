@@ -19,18 +19,22 @@ class Config(QConfig):
     LeftMargin = RangeConfigItem("MainWindow", "LeftMargin", 10, RangeValidator(0, 1080))
     RightMargin = RangeConfigItem("MainWindow", "RightMargin", 10, RangeValidator(0, 1080))
 
+    ScreenShotPath = ConfigItem("MainWindow", "ScreenShotPath", os.path.join(os.path.expanduser('~'), 'AriaToolkit', 'Random', 'ScreenShot'), ConfigValidator())
+
     RunHotKey = ConfigItem("MainWindow", "RunHotKey", "Ctrl+F1", ConfigValidator())
     ShowHotKey = ConfigItem("MainWindow", "ShowHotKey", "Ctrl+F2", ConfigValidator())
     HideHotKey = ConfigItem("MainWindow", "HideHotKey", "Ctrl+F3", ConfigValidator())
+    ScreenShotHotKey = ConfigItem("MainWindow", "ScreenShotHotKey", "Ctrl+F5", ConfigValidator())
     EnableRunHotKey = ConfigItem("MainWindow", "EnableRunHotKey", True, BoolValidator())
     EnableShowHotKey = ConfigItem("MainWindow", "EnableShowHotKey", True, BoolValidator())
     EnableHideHotKey = ConfigItem("MainWindow", "EnableHideHotKey", True, BoolValidator())
+    EnableScreenShotHotKey = ConfigItem("MainWindow", "EnableScreenShotHotKey", True, BoolValidator())
 
     EnableCustomStyleSheet = ConfigItem("MainWindow", "EnableCustomStyleSheet", False, BoolValidator())
     QssPath = ConfigItem("MainWindow", "QssPath", os.path.join(os.path.expanduser('~'), 'AriaToolkit', 'Random', 'qss', 'demo.qss'), ConfigValidator())
 
 
 YEAR = "2025"
-VERSION = "5.2.0"
+VERSION = "5.3.0"
 cfg = Config()
 qconfig.load(os.path.join(os.path.expanduser('~'), 'AriaToolkit', 'Random', 'config', 'config.json'), cfg)

@@ -641,6 +641,108 @@ class SpinBoxItem(QWidget):
         self.hBoxLayout.setAlignment(Qt.AlignVCenter)
 
 
+class FolderItem(QWidget):
+    def __init__(self, folder: str, parent=None):
+        super().__init__(parent=parent)
+        text = "自动保存的位置: " + os.path.basename(folder)
+
+        self.hBoxLayout = QHBoxLayout(self)
+        self.folderLabel = BodyLabel(text, self)
+        if darkdetect.isDark():
+            self.folderLabel.setStyleSheet("font: 13px 'Segoe UI', 'Microsoft YaHei', 'PingFang SC'; padding: 0; border: none; background-color: transparent; color: white;")
+        else:
+            self.folderLabel.setStyleSheet("font: 13px 'Segoe UI', 'Microsoft YaHei', 'PingFang SC'; padding: 0; border: none; background-color: transparent; color: black;")
+
+        self.changeButton = HyperlinkButton(self)
+        self.changeButton.setText("更改")
+
+        self.setFixedHeight(53)
+        self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+        self.hBoxLayout.setContentsMargins(20, 0, 20, 0)
+        self.hBoxLayout.addWidget(self.folderLabel, 0, Qt.AlignLeft)
+        self.hBoxLayout.addSpacing(16)
+        self.hBoxLayout.addStretch(1)
+        self.hBoxLayout.addWidget(self.changeButton, 0, Qt.AlignRight)
+        self.hBoxLayout.setAlignment(Qt.AlignVCenter)
+
+    def setFolder(self, folder):
+        text = "自动保存的位置: " + os.path.basename(folder)
+        self.folderLabel.setText(text)
+        if darkdetect.isDark():
+            self.folderLabel.setStyleSheet("font: 13px 'Segoe UI', 'Microsoft YaHei', 'PingFang SC'; padding: 0; border: none; background-color: transparent; color: white;")
+        else:
+            self.folderLabel.setStyleSheet("font: 13px 'Segoe UI', 'Microsoft YaHei', 'PingFang SC'; padding: 0; border: none; background-color: transparent; color: black;")
+
+
+class OpenFolderItem(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+
+        self.openButton = PushButton(self)
+        self.openButton.setText("打开文件夹")
+        self.openButton.clicked.connect(self.openFolder)
+
+        self.setFixedHeight(53)
+        self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+        self.hBoxLayout = QHBoxLayout(self)
+        self.hBoxLayout.setContentsMargins(20, 0, 20, 0)
+        self.hBoxLayout.addSpacing(16)
+        self.hBoxLayout.addStretch(1)
+        self.hBoxLayout.addWidget(self.openButton, 0, Qt.AlignRight)
+        self.hBoxLayout.setAlignment(Qt.AlignVCenter)
+
+    def openFolder(self):
+        try:
+            os.startfile(cfg.ScreenShotPath.value)
+        except:
+            pass
+
+
+class CustomPathSettingCard(ExpandSettingCard):
+
+    def __init__(self, title: str, content: str = None, parent=None):
+        """
+        Parameters
+        ----------
+        title: str
+            the title of card
+
+        content: str
+            the content of card
+
+        parent: QWidget
+            parent widget
+        """
+        super().__init__(FIF.CAMERA, title, content, parent)
+        self.__initWidget()
+
+    def __initWidget(self):
+        self.viewLayout.setSpacing(0)
+        self.viewLayout.setAlignment(Qt.AlignTop)
+        self.viewLayout.setContentsMargins(0, 0, 0, 0)
+
+        self.folderItem = FolderItem(cfg.ScreenShotPath.value, self.view)
+        self.folderItem.changeButton.clicked.connect(self.showFolderDialog)
+        self.openFolderItem = OpenFolderItem(self.view)
+
+        self.viewLayout.addWidget(self.folderItem)
+        self.viewLayout.addWidget(self.openFolderItem)
+
+        self.updateContent()
+        self._adjustViewSize()
+
+    def showFolderDialog(self):
+        folder = QFileDialog.getExistingDirectory(self, self.tr("选择文件夹"), os.path.join(os.path.expanduser('~'), 'AriaToolkit', 'Random'))
+        if not folder:
+            return
+
+        cfg.set(cfg.ScreenShotPath, folder)
+        self.folderItem.setFolder(cfg.ScreenShotPath.value)
+
+    def updateContent(self):
+        self.folderItem.setFolder(cfg.ScreenShotPath.value)
+
+
 class CustomScreenMarginSettingCard(ExpandSettingCard):
 
     def __init__(self, title: str, content: str = None, parent=None):
@@ -673,8 +775,6 @@ class CustomScreenMarginSettingCard(ExpandSettingCard):
         self.bottomMargin.spinBox.valueChanged.connect(lambda: self.setValue(1))
         self.leftMargin.spinBox.valueChanged.connect(lambda: self.setValue(2))
         self.rightMargin.spinBox.valueChanged.connect(lambda: self.setValue(3))
-
-        self.updateValue()
 
         self.viewLayout.addWidget(self.topMargin)
         self.viewLayout.addWidget(self.bottomMargin)
@@ -1048,6 +1148,7 @@ class HomeInterface(SmoothScrollArea):
         self.elementGroup = SettingCardGroup(self.tr('通用'), self.scrollWidget)
         self.appearanceGroup = SettingCardGroup(self.tr('外观'), self.scrollWidget)
         self.actGroup = SettingCardGroup(self.tr('行为'), self.scrollWidget)
+        self.toolGroup = SettingCardGroup(self.tr('工具'), self.scrollWidget)
         self.hotkeyGroup = SettingCardGroup(self.tr('快捷键'), self.scrollWidget)
         self.advanceGroup = SettingCardGroup(self.tr('高级'), self.scrollWidget)
 
@@ -1109,6 +1210,11 @@ class HomeInterface(SmoothScrollArea):
             content="展开选项卡以设置",
             parent=self.actGroup)
 
+        self.screenShotPathCard = CustomPathSettingCard(
+            title="屏幕快照",
+            content="展开选项卡以设置",
+            parent=self.toolGroup)
+
         self.runHotKeyCard = HotkeySettingCard(
             FIF.SEND,
             self.tr('生成随机数'),
@@ -1129,6 +1235,13 @@ class HomeInterface(SmoothScrollArea):
             cfg.HideHotKey.value if cfg.EnableHideHotKey.value else self.tr("未启用"),
             hotKey=cfg.HideHotKey,
             enableHotKey=cfg.EnableHideHotKey,
+            parent=self.hotkeyGroup)
+        self.screenShotHotKeyCard = HotkeySettingCard(
+            FIF.CAMERA,
+            self.tr("屏幕快照"),
+            cfg.ScreenShotHotKey.value if cfg.EnableScreenShotHotKey.value else self.tr("未启用"),
+            hotKey=cfg.ScreenShotHotKey,
+            enableHotKey=cfg.EnableScreenShotHotKey,
             parent=self.hotkeyGroup)
 
         self.recoverCard = PushSettingCard(
@@ -1177,9 +1290,11 @@ class HomeInterface(SmoothScrollArea):
         self.actGroup.addSettingCard(self.showTimeCard)
         self.actGroup.addSettingCard(self.positionCard)
         self.actGroup.addSettingCard(self.marginCard)
+        self.toolGroup.addSettingCard(self.screenShotPathCard)
         self.hotkeyGroup.addSettingCard(self.runHotKeyCard)
         self.hotkeyGroup.addSettingCard(self.showHotKeyCard)
         self.hotkeyGroup.addSettingCard(self.hideHotKeyCard)
+        self.hotkeyGroup.addSettingCard(self.screenShotHotKeyCard)
         self.advanceGroup.addSettingCard(self.recoverCard)
         self.advanceGroup.addSettingCard(self.devCard)
         self.advanceGroup.addSettingCard(self.helpCard)
@@ -1189,6 +1304,7 @@ class HomeInterface(SmoothScrollArea):
         self.expandLayout.addWidget(self.elementGroup)
         self.expandLayout.addWidget(self.appearanceGroup)
         self.expandLayout.addWidget(self.actGroup)
+        self.expandLayout.addWidget(self.toolGroup)
         self.expandLayout.addWidget(self.hotkeyGroup)
         self.expandLayout.addWidget(self.advanceGroup)
 
@@ -1211,6 +1327,7 @@ class HomeInterface(SmoothScrollArea):
             self.runHotKeyCard.setValue("Ctrl+F1", True)
             self.showHotKeyCard.setValue("Ctrl+F2", True)
             self.hideHotKeyCard.setValue("Ctrl+F3", True)
+            self.screenShotHotKeyCard.setValue("Ctrl+F5", True)
 
             cfg.set(cfg.TopMargin, 50)
             cfg.set(cfg.BottomMargin, 50)
@@ -1250,6 +1367,8 @@ class HomeInterface(SmoothScrollArea):
                 self.showHotKeyCard.setValue(w.hotkeyEdit.text(), w.enableCheckBox.isChecked())
             elif index == 3:
                 self.hideHotKeyCard.setValue(w.hotkeyEdit.text(), w.enableCheckBox.isChecked())
+            elif index == 4:
+                self.screenShotHotKeyCard.setValue(w.hotkeyEdit.text(), w.enableCheckBox.isChecked())
 
     def onApplyBtn(self):
         w = MessageBox(
@@ -1283,6 +1402,7 @@ class HomeInterface(SmoothScrollArea):
         self.runHotKeyCard.clicked.connect(lambda: self.onHotkeyCardClicked(1))
         self.showHotKeyCard.clicked.connect(lambda: self.onHotkeyCardClicked(2))
         self.hideHotKeyCard.clicked.connect(lambda: self.onHotkeyCardClicked(3))
+        self.screenShotHotKeyCard.clicked.connect(lambda: self.onHotkeyCardClicked(4))
 
 
 class StyleSheetInterface(SmoothScrollArea):
@@ -1791,6 +1911,9 @@ class HotkeyMessageBox(CustomMessageBoxBase):
         elif index == 3:
             self.hotkeyEdit.setText(cfg.HideHotKey.value)
             self.enableCheckBox.setChecked(cfg.EnableHideHotKey.value)
+        elif index == 4:
+            self.hotkeyEdit.setText(cfg.ScreenShotHotKey.value)
+            self.enableCheckBox.setChecked(cfg.EnableScreenShotHotKey.value)
 
         self.viewLayout.addWidget(self.titleLabel)
         self.viewLayout.addWidget(self.bodyLabel)

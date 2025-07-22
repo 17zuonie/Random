@@ -3,6 +3,7 @@
 import os
 import re
 import sys
+import mss
 import random
 import win32gui
 import win32con
@@ -205,7 +206,8 @@ class HotKeyManager(QThread):
 
     def run(self):
         while self.isListening:
-            if not windll.user32.RegisterHotKey(None, 1, self.modifiers, self.main_key):
+            hotkey_id = int(self.hotkeyName, 36) % 0xBFFF
+            if not windll.user32.RegisterHotKey(None, hotkey_id, self.modifiers, self.main_key):
                 self.isListening = False
                 self.showDialogRequested.emit(self.hotkeyName)
                 return
@@ -213,10 +215,10 @@ class HotKeyManager(QThread):
                 msg = MSG()
                 if windll.user32.GetMessageA(byref(msg), None, 0, 0) != 0:
                     if msg.message == win32con.WM_HOTKEY:
-                        if msg.wParam == 1:
+                        if msg.wParam == hotkey_id:
                             self.isPressed.emit(self.hotkeyName)
             finally:
-                windll.user32.UnregisterHotKey(None, 1)
+                windll.user32.UnregisterHotKey(None, hotkey_id)
 
 
 class Main(QWidget):
@@ -232,6 +234,7 @@ class Main(QWidget):
         self.runHotKey = cfg.RunHotKey.value
         self.showHotKey = cfg.ShowHotKey.value
         self.hideHotKey = cfg.HideHotKey.value
+        self.screenShotHotKey = cfg.ScreenShotHotKey.value
         self.topMargin = cfg.TopMargin.value
         self.bottomMargin = cfg.BottomMargin.value
         self.leftMargin = cfg.LeftMargin.value
@@ -307,13 +310,15 @@ class Main(QWidget):
             self.timer.timeout.connect(self.updateTime)
 
     def setupHotKey(self):
-        self.hotKeyDict = {"Run": "", "Show": "", "Hide": ""}
-        if self.runHotKey:
+        self.hotKeyDict = {"Run": "", "Show": "", "Hide": "", "ScreenShot": ""}
+        if cfg.EnableRunHotKey.value and self.runHotKey:
             self.hotKeyDict["Run"] = self.runHotKey
-        if self.showHotKey:
+        if cfg.EnableShowHotKey.value and self.showHotKey:
             self.hotKeyDict["Show"] = self.showHotKey
-        if self.hideHotKey:
+        if cfg.EnableHideHotKey.value and self.hideHotKey:
             self.hotKeyDict["Hide"] = self.hideHotKey
+        if cfg.EnableScreenShotHotKey.value and self.screenShotHotKey:
+            self.hotKeyDict["ScreenShot"] = self.screenShotHotKey
 
         self.hotkeyManagers = []
         for name, key in self.hotKeyDict.items():
@@ -404,12 +409,19 @@ class Main(QWidget):
         self._bottomcenter_action.triggered.connect(lambda: self.moveWidget("BottomCenter"))
         self._bottomright_action.triggered.connect(lambda: self.moveWidget("BottomRight"))
 
+        runShortCut = self.runHotKey if cfg.EnableRunHotKey.value else ""
         hideShortCut = self.hideHotKey if cfg.EnableHideHotKey.value else ""
         showShortCut = self.showHotKey if cfg.EnableShowHotKey.value else ""
+        screenShotShortCut = self.screenShotHotKey if cfg.EnableScreenShotHotKey.value else ""
+        self._run_action = QAction(FIF.SEND.icon(), "生成随机数", shortcut=runShortCut, parent=self)
         self._hide_action = QAction(FIF.REMOVE_FROM.icon(), "隐藏", shortcut=hideShortCut, parent=self)
         self._restore_action = QAction(FIF.ADD_TO.icon(), "显示", shortcut=showShortCut, parent=self)
+        self._run_action.triggered.connect(self.run)
         self._hide_action.triggered.connect(self.hide)
         self._restore_action.triggered.connect(self.restoreFromTray)
+
+        self._capture_screen_action = QAction(FIF.CAMERA.icon(), "屏幕快照", shortcut=screenShotShortCut, parent=self)
+        self._capture_screen_action.triggered.connect(self.captureScreen)
 
         self._quit_action = QAction(FIF.CLOSE.icon(), "退出", self)
         self._quit_action.triggered.connect(self.quit)
@@ -419,11 +431,14 @@ class Main(QWidget):
         self.subMenu.setIcon(FIF.MOVE)
         self.subMenu.addActions([self._topleft_action, self._topcenter_action, self._topright_action, self._bottomleft_action, self._bottomcenter_action, self._bottomright_action])
 
-        self._tray_icon_menu.addAction(self._setting_action)
-        self._tray_icon_menu.addAction(self._help_action)
+        self._tray_icon_menu.addAction(self._run_action)
+        self._tray_icon_menu.addAction(self._capture_screen_action)
         self._tray_icon_menu.addSeparator()
         self._tray_icon_menu.addAction(self._reset_action)
         self._tray_icon_menu.addMenu(self.subMenu)
+        self._tray_icon_menu.addSeparator()
+        self._tray_icon_menu.addAction(self._setting_action)
+        self._tray_icon_menu.addAction(self._help_action)
         self._tray_icon_menu.addSeparator()
         self._tray_icon_menu.addAction(self._restore_action)
         self._tray_icon_menu.addAction(self._hide_action)
@@ -433,6 +448,14 @@ class Main(QWidget):
         self.tray_icon.show()
 
     def quit(self):
+        self.hide()
+
+        if hasattr(self, 'hotkeyManagers'):
+            for manager in self.hotkeyManagers:
+                manager.isListening = False
+                manager.quit()
+                manager.wait(1000)
+
         for manager in self.hotkeyManagers:
             manager.isListening = False
             manager.terminate()
@@ -448,6 +471,8 @@ class Main(QWidget):
             self.restoreFromTray()
         elif hotkeyName == "Hide":
             self.hide()
+        elif hotkeyName == "ScreenShot":
+            self.captureScreen()
 
     def showHotkeyWarning(self, hotkeyName):
         if hotkeyName == "Run":
@@ -456,6 +481,9 @@ class Main(QWidget):
             error = "显示"
         elif hotkeyName == "Hide":
             error = "隐藏"
+        elif hotkeyName == "ScreenShot":
+            error = "屏幕快照"
+
         w = Dialog("警告", f"检测到快捷键冲突: {error}", self)
         w.yesButton.setText("转到设置")
         w.cancelButton.setText("忽略")
@@ -511,6 +539,14 @@ class Main(QWidget):
                 win32gui.ShowWindow(i[0], 4)
                 win32gui.SetForegroundWindow(i[0])
                 break
+
+    def captureScreen(self):
+        with mss.mss() as sct:
+            monitor = sct.monitors[0]
+            screenshot = sct.grab(monitor)
+            fileName = QDateTime.currentDateTime().toString('yyyyMMddhhmmsszzz') + ".png"
+            path = os.path.join(cfg.ScreenShotPath.value, fileName)
+            mss.tools.to_png(screenshot.rgb, screenshot.size, output=path)
 
 
 if __name__ == "__main__":
