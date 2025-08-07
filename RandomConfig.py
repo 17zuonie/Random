@@ -35,6 +35,6 @@ class Config(QConfig):
 
 
 YEAR = "2025"
-VERSION = "5.3.0"
+VERSION = "5.3.1"
 cfg = Config()
 qconfig.load(os.path.join(os.path.expanduser('~'), 'AriaToolkit', 'Random', 'config', 'config.json'), cfg)

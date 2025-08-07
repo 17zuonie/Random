@@ -641,61 +641,55 @@ class SpinBoxItem(QWidget):
         self.hBoxLayout.setAlignment(Qt.AlignVCenter)
 
 
-class FolderItem(QWidget):
+class ShowFolderItem(QWidget):
     def __init__(self, folder: str, parent=None):
         super().__init__(parent=parent)
-        text = "自动保存的位置: " + os.path.basename(folder)
 
-        self.hBoxLayout = QHBoxLayout(self)
-        self.folderLabel = BodyLabel(text, self)
-        if darkdetect.isDark():
-            self.folderLabel.setStyleSheet("font: 13px 'Segoe UI', 'Microsoft YaHei', 'PingFang SC'; padding: 0; border: none; background-color: transparent; color: white;")
-        else:
-            self.folderLabel.setStyleSheet("font: 13px 'Segoe UI', 'Microsoft YaHei', 'PingFang SC'; padding: 0; border: none; background-color: transparent; color: black;")
+        self.titleLabel = BodyLabel("自动保存的位置", self)
+        self.folderLabel = BodyLabel(self)
+        self.folderLabel.setText(folder)
+        self.applyStyleSheet()
 
         self.changeButton = HyperlinkButton(self)
         self.changeButton.setText("更改")
-
-        self.setFixedHeight(53)
-        self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
-        self.hBoxLayout.setContentsMargins(20, 0, 20, 0)
-        self.hBoxLayout.addWidget(self.folderLabel, 0, Qt.AlignLeft)
-        self.hBoxLayout.addSpacing(16)
-        self.hBoxLayout.addStretch(1)
-        self.hBoxLayout.addWidget(self.changeButton, 0, Qt.AlignRight)
-        self.hBoxLayout.setAlignment(Qt.AlignVCenter)
-
-    def setFolder(self, folder):
-        text = "自动保存的位置: " + os.path.basename(folder)
-        self.folderLabel.setText(text)
-        if darkdetect.isDark():
-            self.folderLabel.setStyleSheet("font: 13px 'Segoe UI', 'Microsoft YaHei', 'PingFang SC'; padding: 0; border: none; background-color: transparent; color: white;")
-        else:
-            self.folderLabel.setStyleSheet("font: 13px 'Segoe UI', 'Microsoft YaHei', 'PingFang SC'; padding: 0; border: none; background-color: transparent; color: black;")
-
-
-class OpenFolderItem(QWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent=parent)
-
-        self.openButton = PushButton(self)
-        self.openButton.setText("打开文件夹")
+        self.openButton = HyperlinkButton(self)
+        self.openButton.setText("打开")
         self.openButton.clicked.connect(self.openFolder)
 
-        self.setFixedHeight(53)
-        self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
-        self.hBoxLayout = QHBoxLayout(self)
-        self.hBoxLayout.setContentsMargins(20, 0, 20, 0)
-        self.hBoxLayout.addSpacing(16)
-        self.hBoxLayout.addStretch(1)
-        self.hBoxLayout.addWidget(self.openButton, 0, Qt.AlignRight)
-        self.hBoxLayout.setAlignment(Qt.AlignVCenter)
+        self.textLayout = QVBoxLayout()
+        self.buttonLayout = QHBoxLayout()
+        self.vBoxLayout = QVBoxLayout(self)
+        self.vBoxLayout.setSpacing(0)
+        self.textLayout.setContentsMargins(20, 0, 20, 10)
+        self.buttonLayout.setContentsMargins(20, 10, 20, 0)
+        self.vBoxLayout.setContentsMargins(0, 18, 0, 16)
+        self.textLayout.addWidget(self.titleLabel)
+        self.textLayout.addWidget(self.folderLabel)
+        self.textLayout.setAlignment(Qt.AlignVCenter)
+        self.buttonLayout.addStretch(1)
+        self.buttonLayout.addWidget(self.changeButton)
+        self.buttonLayout.addSpacing(16)
+        self.buttonLayout.addWidget(self.openButton)
+        self.vBoxLayout.addLayout(self.textLayout)
+        self.vBoxLayout.addLayout(self.buttonLayout)
+
+    def setFolder(self, folder):
+        self.folderLabel.setText(folder)
+        self.applyStyleSheet()
 
     def openFolder(self):
         try:
             os.startfile(cfg.ScreenShotPath.value)
         except:
             pass
+
+    def applyStyleSheet(self):
+        if darkdetect.isDark():
+            self.titleLabel.setStyleSheet("font: 14px 'Segoe UI', 'Microsoft YaHei', 'PingFang SC'; padding: 0; border: none; background-color: transparent; color: white;")
+            self.folderLabel.setStyleSheet("font: 11px 'Segoe UI', 'Microsoft YaHei', 'PingFang SC'; padding: 0; border: none; background-color: transparent; color: rgb(208, 208, 208);")
+        else:
+            self.titleLabel.setStyleSheet("font: 14px 'Segoe UI', 'Microsoft YaHei', 'PingFang SC'; padding: 0; border: none; background-color: transparent; color: black;")
+            self.folderLabel.setStyleSheet("font: 11px 'Segoe UI', 'Microsoft YaHei', 'PingFang SC'; padding: 0; border: none; background-color: transparent; color: rgb(96, 96, 96);")
 
 
 class CustomPathSettingCard(ExpandSettingCard):
@@ -721,12 +715,9 @@ class CustomPathSettingCard(ExpandSettingCard):
         self.viewLayout.setAlignment(Qt.AlignTop)
         self.viewLayout.setContentsMargins(0, 0, 0, 0)
 
-        self.folderItem = FolderItem(cfg.ScreenShotPath.value, self.view)
-        self.folderItem.changeButton.clicked.connect(self.showFolderDialog)
-        self.openFolderItem = OpenFolderItem(self.view)
-
-        self.viewLayout.addWidget(self.folderItem)
-        self.viewLayout.addWidget(self.openFolderItem)
+        self.showFolderItem = ShowFolderItem(cfg.ScreenShotPath.value, self.view)
+        self.showFolderItem.changeButton.clicked.connect(self.showFolderDialog)
+        self.viewLayout.addWidget(self.showFolderItem)
 
         self.updateContent()
         self._adjustViewSize()
@@ -737,10 +728,10 @@ class CustomPathSettingCard(ExpandSettingCard):
             return
 
         cfg.set(cfg.ScreenShotPath, folder)
-        self.folderItem.setFolder(cfg.ScreenShotPath.value)
+        self.showFolderItem.setFolder(cfg.ScreenShotPath.value)
 
     def updateContent(self):
-        self.folderItem.setFolder(cfg.ScreenShotPath.value)
+        self.showFolderItem.setFolder(cfg.ScreenShotPath.value)
 
 
 class CustomScreenMarginSettingCard(ExpandSettingCard):
@@ -1623,10 +1614,8 @@ class InfoIconWidget(QWidget):
         painter.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
 
         rect = QRectF(10, 10, 15, 15)
-        if self.icon != InfoBarIcon.INFORMATION:
+        if self.icon:
             drawIcon(self.icon, painter, rect)
-        else:
-            drawIcon(self.icon, painter, rect, indexes=[0], fill=QColor("#0063b1").name())
 
 
 class WarningBar(QFrame):
