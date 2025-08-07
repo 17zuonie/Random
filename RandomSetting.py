@@ -56,8 +56,11 @@ class Mutex:
         if self.file:
             try:
                 portalocker.unlock(self.file)
-                self.file.close()
             finally:
+                try:
+                    self.file.close()
+                except:
+                    pass
                 try:
                     os.remove('RandomSetting.lockfile')
                 except:
