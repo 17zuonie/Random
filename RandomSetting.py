@@ -9,13 +9,12 @@ import portalocker
 import RandomResource
 from enum import Enum
 from typing import Union
-from webbrowser import open as WebOpen
 from psutil import process_iter, Process
 from RandomConfig import cfg, VERSION, YEAR
 from pygetwindow import getWindowsWithTitle as GetWindow
 from PyQt5.QtCore import Qt, pyqtSignal, QRectF, QEasingCurve, QEvent, QTimer, QModelIndex, QObject, QRunnable, \
-    QThreadPool
-from PyQt5.QtGui import QColor, QIcon, QPainter, QTextCursor, QPainterPath, QKeySequence
+    QThreadPool, QUrl
+from PyQt5.QtGui import QColor, QIcon, QPainter, QTextCursor, QPainterPath, QKeySequence, QDesktopServices
 from PyQt5.QtWidgets import QFrame, QApplication, QWidget, QHBoxLayout, QLabel, QVBoxLayout, QPushButton, \
     QTextBrowser, QTextEdit, QLineEdit, QSpinBox, QScrollArea, QScroller, QAction, QFileDialog, QCompleter, QSizePolicy
 from qfluentwidgets import NavigationItemPosition, SubtitleLabel, MessageBox, ExpandLayout, MaskDialogBase, \
@@ -23,7 +22,7 @@ from qfluentwidgets import NavigationItemPosition, SubtitleLabel, MessageBox, Ex
     isDarkTheme, ConfigItem, OptionsConfigItem, FluentStyleSheet, HyperlinkButton, IconWidget, drawIcon, \
     setThemeColor, ImageLabel, MessageBoxBase, SmoothScrollDelegate, setFont, themeColor, setTheme, Theme, qrouter, \
     NavigationBar, NavigationBarPushButton, SplashScreen, Slider, OptionsSettingCard, InfoBar, TransparentToolButton, \
-    BodyLabel, InfoBarPosition, CheckBox, PushButton, ExpandSettingCard, ToolTipFilter, ToolTipPosition
+    BodyLabel, InfoBarPosition, CheckBox, PushButton, ExpandSettingCard, ToolTipFilter, ToolTipPosition, FluentFontIconBase
 from qfluentwidgets.components.widgets.line_edit import EditLayer, LineEditButton, CompleterMenu
 from qfluentwidgets.components.widgets.menu import MenuAnimationType, RoundMenu
 from qfluentwidgets.components.widgets.spin_box import SpinButton, SpinIcon
@@ -31,7 +30,6 @@ from qfluentwidgets.window.fluent_window import FluentWindowBase
 from qframelesswindow.titlebar import MinimizeButton, CloseButton, MaximizeButton
 from qframelesswindow import TitleBarButton
 from qframelesswindow.utils import startSystemMove
-from qfluentwidgets import FluentIcon as FIF
 
 
 class Mutex:
@@ -65,6 +63,12 @@ class Mutex:
                     os.remove('RandomSetting.lockfile')
                 except:
                     pass
+
+
+class FluentFontIcon(FluentFontIconBase):
+
+    def path(self, theme=Theme.AUTO):
+        return "Font/SegoeIcons.ttf"
 
 
 class SmoothScrollArea(QScrollArea):
@@ -104,28 +108,28 @@ class EditMenu(RoundMenu):
     # noinspection PyArgumentList
     def createActions(self):
         self.cutAct = QAction(
-            FIF.CUT.icon(),
+            FluentFontIcon("\ue8c6").icon(),
             self.tr("剪切"),
             self,
             shortcut="Ctrl+X",
             triggered=self.parent().cut,
         )
         self.copyAct = QAction(
-            FIF.COPY.icon(),
+            FluentFontIcon("\ue8c8").icon(),
             self.tr("复制"),
             self,
             shortcut="Ctrl+C",
             triggered=self.parent().copy,
         )
         self.pasteAct = QAction(
-            FIF.PASTE.icon(),
+            FluentFontIcon("\ue77f").icon(),
             self.tr("粘贴"),
             self,
             shortcut="Ctrl+V",
             triggered=self.parent().paste,
         )
         self.cancelAct = QAction(
-            FIF.CANCEL.icon(),
+            FluentFontIcon("\ue7a7").icon(),
             self.tr("撤销"),
             self,
             shortcut="Ctrl+Z",
@@ -228,7 +232,7 @@ class LineEdit(QLineEdit):
         setFont(self)
 
         self.hBoxLayout = QHBoxLayout(self)
-        self.clearButton = LineEditButton(FIF.CLOSE, self)
+        self.clearButton = LineEditButton(FluentFontIcon("\ue711"), self)
 
         self.clearButton.setFixedSize(29, 25)
         self.clearButton.hide()
@@ -544,7 +548,7 @@ class SettingIconWidget(IconWidget):
 
 
 class SettingCard(QFrame):
-    def __init__(self, icon: Union[str, QIcon, FIF], title, content=None, parent=None):
+    def __init__(self, icon: Union[str, QIcon], title, content=None, parent=None):
         """
         Parameters
         ----------
@@ -710,7 +714,7 @@ class CustomPathSettingCard(ExpandSettingCard):
         parent: QWidget
             parent widget
         """
-        super().__init__(FIF.CAMERA, title, content, parent)
+        super().__init__(FluentFontIcon("\ue722"), title, content, parent)
         self.__initWidget()
 
     def __initWidget(self):
@@ -726,7 +730,7 @@ class CustomPathSettingCard(ExpandSettingCard):
         self._adjustViewSize()
 
     def showFolderDialog(self):
-        folder = QFileDialog.getExistingDirectory(self, self.tr("选择文件夹"), os.path.join(os.path.expanduser('~'), 'AriaToolkit', 'Random'))
+        folder = QFileDialog.getExistingDirectory(self, self.tr("选择文件夹"), os.path.join(os.path.expanduser('~'), '.Random'))
         if not folder:
             return
 
@@ -752,7 +756,7 @@ class CustomScreenMarginSettingCard(ExpandSettingCard):
         parent: QWidget
             parent widget
         """
-        super().__init__(FIF.FIT_PAGE, title, content, parent)
+        super().__init__(FluentFontIcon("\ue9a6"), title, content, parent)
         self.__initWidget()
 
     def __initWidget(self):
@@ -797,7 +801,7 @@ class CustomScreenMarginSettingCard(ExpandSettingCard):
 class SwitchSettingCard(SettingCard):
     checkedChanged = pyqtSignal(bool)
 
-    def __init__(self, icon: Union[str, QIcon, FIF], title, content=None,
+    def __init__(self, icon: Union[str, QIcon], title, content=None,
                  configItem: ConfigItem = None, parent=None):
         """
         Parameters
@@ -854,7 +858,7 @@ class SwitchSettingCard(SettingCard):
 class PushSettingCard(SettingCard):
     clicked = pyqtSignal()
 
-    def __init__(self, text, icon: Union[str, QIcon, FIF], title, content=None, parent=None):
+    def __init__(self, text, icon: Union[str, QIcon], title, content=None, parent=None):
         """
         Parameters
         ----------
@@ -889,7 +893,7 @@ class PrimaryPushSettingCard(PushSettingCard):
 class HotkeySettingCard(SettingCard):
     clicked = pyqtSignal()
 
-    def __init__(self, icon: Union[str, QIcon, FIF], title, content=None,
+    def __init__(self, icon: Union[str, QIcon], title, content=None,
                  hotKey=None, enableHotKey=None, parent=None):
         """
         Parameters
@@ -914,7 +918,7 @@ class HotkeySettingCard(SettingCard):
         self.hotKey = hotKey
         self.enableHotKey = enableHotKey
         self.button = TransparentToolButton(self)
-        self.button.setIcon(FIF.EDIT)
+        self.button.setIcon(FluentFontIcon("\ue70f"))
         self.button.setToolTip("设置快捷键")
         self.button.installEventFilter(ToolTipFilter(self.button, 0, ToolTipPosition.BOTTOM))
         self.hBoxLayout.addWidget(self.button, 0, Qt.AlignRight)
@@ -943,7 +947,7 @@ class HotkeySettingCard(SettingCard):
 class SpinBoxSettingCard(SettingCard):
     valueChanged = pyqtSignal(int)
 
-    def __init__(self, configItem: ConfigItem, icon: Union[str, QIcon, FIF], title, content=None, parent=None):
+    def __init__(self, configItem: ConfigItem, icon: Union[str, QIcon], title, content=None, parent=None):
         """
         Parameters
         ----------
@@ -992,7 +996,7 @@ class RangeSettingCard(SettingCard):
 
     valueChanged = pyqtSignal(int)
 
-    def __init__(self, configItem, icon: Union[str, QIcon, FIF], title, content=None, parent=None):
+    def __init__(self, configItem, icon: Union[str, QIcon], title, content=None, parent=None):
         """
         Parameters
         ----------
@@ -1045,7 +1049,7 @@ class RangeSettingCard(SettingCard):
 
 
 class ComboBoxSettingCard(SettingCard):
-    def __init__(self, configItem: OptionsConfigItem, icon: Union[str, QIcon, FIF], title, content=None, texts=None, parent=None):
+    def __init__(self, configItem: OptionsConfigItem, icon: Union[str, QIcon], title, content=None, texts=None, parent=None):
         """
         Parameters
         ----------
@@ -1120,7 +1124,76 @@ class RestartTask(QRunnable):
         self.signals.restartFinished.emit(True)
 
 
-class HomeInterface(SmoothScrollArea):
+class WorkSpaceInterface(SmoothScrollArea):
+
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+        self.scrollWidget = QWidget()
+        self.stateTooltip = None
+        self.expandLayout = ExpandLayout(self.scrollWidget)
+        self.enableTransparentBackground()
+        self.settingLabel = QLabel("工作区", self)
+        self.applyBtn = PrimaryPushButton("应用", self)
+        self.applyBtn.setFixedWidth(80)
+        self.applyBtn.clicked.connect(self.onApplyBtn)
+        if darkdetect.isDark():
+            self.scrollWidget.setStyleSheet("background-color: rgba(39, 39, 39, 0);")
+            self.settingLabel.setStyleSheet("font: 33px 'Microsoft YaHei Light'; background-color: transparent; color: white;")
+        else:
+            self.scrollWidget.setStyleSheet("background-color: rgba(249, 249, 249, 0);")
+            self.settingLabel.setStyleSheet("font: 33px 'Microsoft YaHei Light'; background-color: transparent;")
+
+        self.elementGroup = SettingCardGroup('', self.scrollWidget)
+
+        self.valueCard = SpinBoxSettingCard(
+            cfg.Value,
+            FluentFontIcon("\ue716"),
+            self.tr('人数'),
+            self.tr('更改随机总数'),
+            parent=self.elementGroup)
+        self.noRepeatCard = SwitchSettingCard(
+            FluentFontIcon("\uf5e7"),
+            self.tr("去重"),
+            self.tr("随机数不重复"),
+            configItem=cfg.NoRepeat,
+            parent=self.elementGroup)
+
+        self.__initWidget()
+
+    def __initWidget(self):
+        self.resize(500, 800)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setViewportMargins(0, 60, 0, 5)
+        self.setWidget(self.scrollWidget)
+        self.setWidgetResizable(True)
+
+        self.__initLayout()
+
+    def __initLayout(self):
+        self.settingLabel.move(30, 10)
+        self.applyBtn.move(285, 15)
+
+        self.elementGroup.addSettingCard(self.valueCard)
+        self.elementGroup.addSettingCard(self.noRepeatCard)
+
+        self.expandLayout.setSpacing(28)
+        self.expandLayout.setContentsMargins(25, 20, 25, 20)
+        self.expandLayout.addWidget(self.elementGroup)
+
+    def onApplyBtn(self):
+        w = MessageBox(
+            '重启 Random',
+            '重启 Random 以应用更改',
+            self.window())
+        w.yesButton.setText('立即重启')
+        w.cancelButton.setText('暂不重启')
+        if w.exec():
+            task = RestartTask()
+            task.signals.restartFinished.connect(self.restartThreadFinished)
+            self.threadPool.start(task)
+
+
+class SettingInterface(SmoothScrollArea):
 
     def __init__(self, parent=None):
         super().__init__(parent=parent)
@@ -1139,62 +1212,48 @@ class HomeInterface(SmoothScrollArea):
             self.scrollWidget.setStyleSheet("background-color: rgba(249, 249, 249, 0);")
             self.settingLabel.setStyleSheet("font: 33px 'Microsoft YaHei Light'; background-color: transparent;")
 
-        self.elementGroup = SettingCardGroup(self.tr('通用'), self.scrollWidget)
         self.appearanceGroup = SettingCardGroup(self.tr('外观'), self.scrollWidget)
         self.actGroup = SettingCardGroup(self.tr('行为'), self.scrollWidget)
         self.toolGroup = SettingCardGroup(self.tr('工具'), self.scrollWidget)
         self.hotkeyGroup = SettingCardGroup(self.tr('快捷键'), self.scrollWidget)
         self.advanceGroup = SettingCardGroup(self.tr('高级'), self.scrollWidget)
 
-        self.valueCard = SpinBoxSettingCard(
-            cfg.Value,
-            FIF.PEOPLE,
-            self.tr('人数'),
-            self.tr('更改随机总数'),
-            parent=self.elementGroup)
-        self.noRepeatCard = SwitchSettingCard(
-            FIF.COMPLETED,
-            self.tr("去重"),
-            self.tr("随机数不重复"),
-            configItem=cfg.NoRepeat,
-            parent=self.elementGroup)
-
         self.themeCard = ComboBoxSettingCard(
             cfg.Theme,
-            FIF.BRUSH,
+            FluentFontIcon("\ue793"),
             self.tr('主题'),
             self.tr('更改按钮的颜色主题'),
             texts=[self.tr("浅色"), self.tr("深色"), self.tr("使用系统设置")],
             parent=self.appearanceGroup)
         self.opacityCard = RangeSettingCard(
             cfg.Opacity,
-            FIF.CONSTRACT,
+            FluentFontIcon("\uf1ba"),
             self.tr('不透明度'),
             self.tr('更改按钮的不透明度'),
             parent=self.appearanceGroup)
         self.zoomCard = OptionsSettingCard(
             cfg.dpiScale,
-            FIF.ZOOM,
+            FluentFontIcon("\ue93a"),
             self.tr("缩放"),
             self.tr("调整界面尺寸"),
             texts=["100%", "125%", "150%", "175%", "200%", self.tr("使用系统设置")],
             parent=self.appearanceGroup)
 
         self.autoRunCard = SwitchSettingCard(
-            FIF.POWER_BUTTON,
+            FluentFontIcon("\ue7e8"),
             self.tr("开机时启动"),
             self.tr(""),
             configItem=cfg.AutoRun,
             parent=self.actGroup)
         self.showTimeCard = SwitchSettingCard(
-            FIF.FONT,
+            FluentFontIcon("\ue917"),
             self.tr("闲时显示时间"),
             self.tr(""),
             configItem=cfg.ShowTime,
             parent=self.actGroup)
         self.positionCard = OptionsSettingCard(
             cfg.Position,
-            FIF.MOVE,
+            FluentFontIcon("\ue7c2"),
             self.tr("位置"),
             self.tr("按钮启动时的出现位置"),
             texts=["左上", "上中", "右上", "左下", "下中", "右下"],
@@ -1204,34 +1263,40 @@ class HomeInterface(SmoothScrollArea):
             content="展开选项卡以设置",
             parent=self.actGroup)
 
+        self.autoHideCard = SwitchSettingCard(
+            FluentFontIcon("\ued1a"),
+            "自动隐藏",
+            "捕获屏幕时自动隐藏按钮",
+            configItem=cfg.IsAutoHide,
+            parent=self.toolGroup)
         self.screenShotPathCard = CustomPathSettingCard(
             title="屏幕快照",
             content="展开选项卡以设置",
             parent=self.toolGroup)
 
         self.runHotKeyCard = HotkeySettingCard(
-            FIF.SEND,
+            FluentFontIcon("\ue724"),
             self.tr('生成随机数'),
             cfg.RunHotKey.value if cfg.EnableRunHotKey.value else self.tr("未启用"),
             hotKey=cfg.RunHotKey,
             enableHotKey=cfg.EnableRunHotKey,
             parent=self.hotkeyGroup)
         self.showHotKeyCard = HotkeySettingCard(
-            FIF.ADD_TO,
+            FluentFontIcon("\uecc8"),
             self.tr('显示'),
             cfg.ShowHotKey.value if cfg.EnableShowHotKey.value else self.tr("未启用"),
             hotKey=cfg.ShowHotKey,
             enableHotKey=cfg.EnableShowHotKey,
             parent=self.hotkeyGroup)
         self.hideHotKeyCard = HotkeySettingCard(
-            FIF.REMOVE_FROM,
+            FluentFontIcon("\uecc9"),
             self.tr('隐藏'),
             cfg.HideHotKey.value if cfg.EnableHideHotKey.value else self.tr("未启用"),
             hotKey=cfg.HideHotKey,
             enableHotKey=cfg.EnableHideHotKey,
             parent=self.hotkeyGroup)
         self.screenShotHotKeyCard = HotkeySettingCard(
-            FIF.CAMERA,
+            FluentFontIcon("\ue722"),
             self.tr("屏幕快照"),
             cfg.ScreenShotHotKey.value if cfg.EnableScreenShotHotKey.value else self.tr("未启用"),
             hotKey=cfg.ScreenShotHotKey,
@@ -1240,19 +1305,19 @@ class HomeInterface(SmoothScrollArea):
 
         self.recoverCard = PushSettingCard(
             self.tr('恢复'),
-            FIF.CLEAR_SELECTION,
+            FluentFontIcon("\uebc4"),
             self.tr('恢复默认设置'),
             self.tr('重置所有参数为初始值'),
             self.advanceGroup)
         self.devCard = PushSettingCard(
             self.tr('打开'),
-            FIF.DEVELOPER_TOOLS,
+            FluentFontIcon("\uec7a"),
             self.tr('开发者选项'),
             self.tr('打开配置文件'),
             self.advanceGroup)
         self.helpCard = PrimaryPushSettingCard(
             self.tr('转到帮助'),
-            FIF.HELP,
+            FluentFontIcon("\uea6b"),
             self.tr('帮助'),
             self.tr('提示与常见问题'),
             self.advanceGroup)
@@ -1275,8 +1340,6 @@ class HomeInterface(SmoothScrollArea):
         self.settingLabel.move(30, 10)
         self.applyBtn.move(285, 15)
 
-        self.elementGroup.addSettingCard(self.valueCard)
-        self.elementGroup.addSettingCard(self.noRepeatCard)
         self.appearanceGroup.addSettingCard(self.themeCard)
         self.appearanceGroup.addSettingCard(self.opacityCard)
         self.appearanceGroup.addSettingCard(self.zoomCard)
@@ -1284,6 +1347,7 @@ class HomeInterface(SmoothScrollArea):
         self.actGroup.addSettingCard(self.showTimeCard)
         self.actGroup.addSettingCard(self.positionCard)
         self.actGroup.addSettingCard(self.marginCard)
+        self.toolGroup.addSettingCard(self.autoHideCard)
         self.toolGroup.addSettingCard(self.screenShotPathCard)
         self.hotkeyGroup.addSettingCard(self.runHotKeyCard)
         self.hotkeyGroup.addSettingCard(self.showHotKeyCard)
@@ -1295,7 +1359,6 @@ class HomeInterface(SmoothScrollArea):
 
         self.expandLayout.setSpacing(28)
         self.expandLayout.setContentsMargins(25, 20, 25, 20)
-        self.expandLayout.addWidget(self.elementGroup)
         self.expandLayout.addWidget(self.appearanceGroup)
         self.expandLayout.addWidget(self.actGroup)
         self.expandLayout.addWidget(self.toolGroup)
@@ -1305,7 +1368,7 @@ class HomeInterface(SmoothScrollArea):
     def recoverConfig(self):
         w = MessageBox(
             '恢复默认设置',
-            '是否要重置所有设置？',
+            '点击确定以重置所有设置为默认值。',
             self.window())
         w.yesButton.setText('确定')
         w.cancelButton.setText('取消')
@@ -1345,12 +1408,12 @@ class HomeInterface(SmoothScrollArea):
     def openConfig(self):
         w = MessageBox(
             '打开配置文件',
-            '即将打开配置文件，请谨慎操作。',
+            '随意修改配置文件可能导致程序异常。点击确定以继续。',
             self.window())
         w.yesButton.setText('确定')
         w.cancelButton.setText('取消')
         if w.exec():
-            os.startfile(os.path.join(os.path.expanduser('~'), 'AriaToolkit', 'Random', 'config', 'config.json'))
+            os.startfile(os.path.join(os.path.expanduser('~'), '.Random', 'config', 'config.json'))
 
     def onHotkeyCardClicked(self, index):
         w = HotkeyMessageBox(index=index, parent=self.window())
@@ -1421,32 +1484,32 @@ class StyleSheetInterface(SmoothScrollArea):
         self.styleSheetGroup = SettingCardGroup('', self.scrollWidget)
 
         self.enableStyleSheetCard = SwitchSettingCard(
-            FIF.CODE,
+            FluentFontIcon("\ue943"),
             self.tr("自定义样式表"),
             self.tr("启用或关闭自定义样式表"),
             configItem=cfg.EnableCustomStyleSheet,
             parent=self.styleSheetGroup)
         self.selectQssCard = PushSettingCard(
             self.tr('选择文件'),
-            FIF.DOCUMENT,
+            FluentFontIcon("\ue8a5"),
             self.tr("样式表文件"),
             os.path.basename(cfg.QssPath.value),
             self.styleSheetGroup)
         self.newQssCard = PushSettingCard(
             self.tr('新建'),
-            FIF.ADD_TO,
+            FluentFontIcon("\uecc8"),
             self.tr("新建样式表"),
             self.tr("创建新的样式表"),
             self.styleSheetGroup)
         self.editQssCard = PushSettingCard(
             self.tr('编辑'),
-            FIF.EDIT,
+            FluentFontIcon("\ue70f"),
             self.tr("编辑样式表"),
             self.tr("编辑选择的的样式表"),
             self.styleSheetGroup)
         self.qssFolderCard = PushSettingCard(
             self.tr('打开'),
-            FIF.FOLDER,
+            FluentFontIcon("\ue8b7"),
             self.tr("样式表文件夹"),
             self.tr("打开默认的样式表文件夹"),
             self.styleSheetGroup)
@@ -1482,7 +1545,7 @@ class StyleSheetInterface(SmoothScrollArea):
         self.expandLayout.addWidget(self.styleSheetGroup)
 
     def __onSelectQssCardClicked(self):
-        file = QFileDialog.getOpenFileName(self, self.tr("选择文件"), os.path.join(os.path.expanduser('~'), 'AriaToolkit', 'Random', 'qss'), self.tr("样式表文件 (*.qss)"))[0]
+        file = QFileDialog.getOpenFileName(self, self.tr("选择文件"), os.path.join(os.path.expanduser('~'), '.Random', 'qss'), self.tr("样式表文件 (*.qss)"))[0]
         if not file or cfg.get(cfg.QssPath) == file:
             return
 
@@ -1493,7 +1556,7 @@ class StyleSheetInterface(SmoothScrollArea):
         w = NewQssMessageBox(parent=self.window())
         if w.exec():
             try:
-                filepath = os.path.join(os.path.expanduser('~'), 'AriaToolkit', 'Random', 'qss', f'{w.nameEdit.text()}.qss')
+                filepath = os.path.join(os.path.expanduser('~'), '.Random', 'qss', f'{w.nameEdit.text()}.qss')
                 content = ''
                 if w.templateCheckBox.isChecked():
                     content = 'QPushButton {\n    background-color: rgb(249, 249, 249);\n    color: rgb(0, 0, 0);\n    border-radius: 16px;\n    border: 0.5px groove gray;\n    border-style: outset;\n    font-family: "Microsoft YaHei";\n    font-size: 15pt;\n}\nQPushButton:hover {\n    background-color: rgba(249, 249, 249, 255);\n}\nQPushButton:pressed {\n    background-color: rgba(249, 249, 249, 255);\n}\n'
@@ -1507,7 +1570,7 @@ class StyleSheetInterface(SmoothScrollArea):
                     isClosable=False,
                     parent=self.window()
                 )
-                os.startfile(os.path.join(os.path.expanduser('~'), 'AriaToolkit', 'Random', 'qss', f'{w.nameEdit.text()}.qss'))
+                os.startfile(os.path.join(os.path.expanduser('~'), '.Random', 'qss', f'{w.nameEdit.text()}.qss'))
             except:
                 InfoBar.error(
                     '',
@@ -1520,7 +1583,7 @@ class StyleSheetInterface(SmoothScrollArea):
 
 
     def __onQssFolderCardClicked(self):
-        os.startfile(os.path.join(os.path.expanduser('~'), 'AriaToolkit', 'Random', 'qss'))
+        os.startfile(os.path.join(os.path.expanduser('~'), '.Random', 'qss'))
 
     def restartThreadFinished(self):
         InfoBar.success(
@@ -1582,12 +1645,12 @@ class DetailMessageBox(MessageBoxBase):
         self.githubBtn.setText('源代码')
         self.websiteBtn.setText('网站主页')
         self.onlineDocBtn.setText('在线文档')
-        self.githubBtn.setIcon(FIF.GITHUB)
-        self.websiteBtn.setIcon(FIF.GLOBE)
-        self.onlineDocBtn.setIcon(FIF.DOCUMENT)
-        self.githubBtn.clicked.connect(lambda: WebOpen("https://github.com/sudo0015/Random"))
-        self.websiteBtn.clicked.connect(lambda: WebOpen("https://sudo0015.github.io/"))
-        self.onlineDocBtn.clicked.connect(lambda: WebOpen("https://sudo0015.github.io/post/Random%20-bang-zhu.html"))
+        self.githubBtn.setIcon(FluentFontIcon("\ue71b"))
+        self.websiteBtn.setIcon(FluentFontIcon("\ue774"))
+        self.onlineDocBtn.setIcon(FluentFontIcon("\ue8a5"))
+        self.githubBtn.setUrl("https://github.com/sudo0015/Random")
+        self.websiteBtn.setUrl("https://sudo0015.github.io/")
+        self.onlineDocBtn.setUrl("https://sudo0015.github.io/post/Random%20-bang-zhu.html")
 
         self.btnLayout = QHBoxLayout(self)
         self.btnLayout.addWidget(self.githubBtn)
@@ -1996,7 +2059,7 @@ class NewQssMessageBox(CustomMessageBoxBase):
         return True
 
     def onYesBtn(self):
-        if os.path.exists(os.path.join(os.path.expanduser('~'), 'AriaToolkit', 'Random', 'qss', f'{self.nameEdit.text()}.qss')):
+        if os.path.exists(os.path.join(os.path.expanduser('~'), '.Random', 'qss', f'{self.nameEdit.text()}.qss')):
             self.nameEdit.clear()
             self.errorBar.contentLabel.setText("文件已存在")
             self.errorBar.setVisible(True)
@@ -2027,25 +2090,25 @@ class AboutInterface(SmoothScrollArea):
         self.aboutGroup = SettingCardGroup(self.tr(''), self.scrollWidget)
         self.aboutESCard = PushSettingCard(
             self.tr('详细信息'),
-            FIF.INFO,
+            FluentFontIcon("\ue946"),
             self.tr('关于 Random'),
             self.tr(f'版本 {VERSION}'),
             self.aboutGroup)
         self.aboutBSCard = PushSettingCard(
             self.tr('了解更多'),
-            FIF.PEOPLE,
+            FluentFontIcon("\ue716"),
             self.tr('关于作者'),
             self.tr('BUG STUDIO'),
             self.aboutGroup)
         self.helpCard = PrimaryPushSettingCard(
             self.tr('转到帮助'),
-            FIF.HELP,
+            FluentFontIcon("\uea6b"),
             self.tr('帮助'),
             self.tr('提示与常见问题'),
             self.aboutGroup)
         self.feedbackCard = PrimaryPushSettingCard(
             self.tr('提供反馈'),
-            FIF.FEEDBACK,
+            FluentFontIcon("\ued15"),
             self.tr('反馈'),
             self.tr('报告问题或提出建议'),
             self.aboutGroup)
@@ -2087,7 +2150,7 @@ class AboutInterface(SmoothScrollArea):
         self.aboutESCard.clicked.connect(self.onAboutESCardClicked)
         self.aboutBSCard.clicked.connect(lambda: os.startfile(os.path.abspath("./Doc/AboutBugStudio.html")))
         self.helpCard.clicked.connect(lambda: os.startfile(os.path.abspath("./Doc/RandomHelp.html")))
-        self.feedbackCard.clicked.connect(lambda: WebOpen("https://github.com/sudo0015/Random/issues"))
+        self.feedbackCard.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://github.com/sudo0015/Random/issues")))
 
 
 class TitleBarBase(QWidget):
@@ -2113,6 +2176,92 @@ class TitleBarBase(QWidget):
     def quit(self):
         self.hide()
         sys.exit()
+
+    def eventFilter(self, obj, e):
+        if obj is self.window():
+            if e.type() == QEvent.WindowStateChange:
+                self.maxBtn.setMaxState(self.window().isMaximized())
+                return False
+
+        return super().eventFilter(obj, e)
+
+    def mouseDoubleClickEvent(self, event):
+        """ Toggles the maximization state of the window """
+        if event.button() != Qt.LeftButton or not self._isDoubleClickEnabled:
+            return
+
+        self.__toggleMaxState()
+
+    def mouseMoveEvent(self, e):
+        if sys.platform != "win32" or not self.canDrag(e.pos()):
+            return
+
+        startSystemMove(self.window(), e.globalPos())
+
+    def mousePressEvent(self, e):
+        if sys.platform == "win32" or not self.canDrag(e.pos()):
+            return
+
+        startSystemMove(self.window(), e.globalPos())
+
+    def __toggleMaxState(self):
+        """ Toggles the maximization state of the window and change icon """
+        if self.window().isMaximized():
+            self.window().showNormal()
+        else:
+            self.window().showMaximized()
+
+        if sys.platform == "win32":
+            from qframelesswindow.utils.win32_utils import releaseMouseLeftButton
+            releaseMouseLeftButton(self.window().winId())
+
+    def _isDragRegion(self, pos):
+        """ Check whether the position belongs to the area where dragging is allowed """
+        width = 0
+        for button in self.findChildren(TitleBarButton):
+            if button.isVisible():
+                width += button.width()
+
+        return 0 < pos.x() < self.width() - width
+
+    def _hasButtonPressed(self):
+        """ whether any button is pressed """
+        return any(btn.isPressed() for btn in self.findChildren(TitleBarButton))
+
+    def canDrag(self, pos):
+        """ whether the position is draggable """
+        return self._isDragRegion(pos) and not self._hasButtonPressed()
+
+    def setDoubleClickEnabled(self, isEnabled):
+        """ whether to switch window maximization status when double clicked
+
+        Parameters
+        ----------
+        isEnabled: bool
+            whether to enable double click
+        """
+        self._isDoubleClickEnabled = isEnabled
+
+
+class TitleBarBase(QWidget):
+    """ Title bar base class """
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.minBtn = MinimizeButton(parent=self)
+        self.closeBtn = CloseButton(parent=self)
+        self.maxBtn = MaximizeButton(parent=self)
+
+        self._isDoubleClickEnabled = True
+
+        self.resize(200, 32)
+        self.setFixedHeight(32)
+
+        self.minBtn.clicked.connect(self.window().showMinimized)
+        self.maxBtn.clicked.connect(self.__toggleMaxState)
+        self.closeBtn.clicked.connect(self.window().close)
+
+        self.window().installEventFilter(self)
 
     def eventFilter(self, obj, e):
         if obj is self.window():
@@ -2264,7 +2413,7 @@ class MSFluentWindow(FluentWindowBase):
         self.titleBar.raise_()
         self.titleBar.setAttribute(Qt.WA_StyledBackground)
 
-    def addSubInterface(self, interface: QWidget, icon: Union[FIF, QIcon, str], text: str,
+    def addSubInterface(self, interface: QWidget, icon: Union[QIcon, str], text: str,
                         selectedIcon=None, position=NavigationItemPosition.TOP, isTransparent=False) -> NavigationBarPushButton:
         """ add sub interface, the object name of `interface` should be set already
         before calling this method
@@ -2328,24 +2477,27 @@ class Main(MSFluentWindow):
         self.splashScreen = SplashScreen(self.windowIcon(), self)
         self.splashScreen.raise_()
 
-        self.homeInterface = HomeInterface(self)
+        self.workspaceInterface = WorkSpaceInterface(self)
+        self.settingInterface = SettingInterface(self)
         self.styleSheetInterface = StyleSheetInterface(self)
         self.aboutInterface = AboutInterface(self)
-        self.homeInterface.setObjectName('homeInterface')
+        self.workspaceInterface.setObjectName('workspaceInterface')
+        self.settingInterface.setObjectName('settingInterface')
         self.styleSheetInterface.setObjectName('styleSheetInterface')
         self.aboutInterface.setObjectName('aboutInterface')
-        self.addSubInterface(self.homeInterface, FIF.HOME, '设置', FIF.HOME_FILL)
-        self.addSubInterface(self.styleSheetInterface, FIF.CODE, "样式表", FIF.CODE)
+        self.addSubInterface(self.workspaceInterface, FluentFontIcon("\ue80f"), '工作区', FluentFontIcon("\uea8a"))
+        self.addSubInterface(self.settingInterface, FluentFontIcon("\ue713"), '设置', FluentFontIcon("\uf8b0"))
+        self.addSubInterface(self.styleSheetInterface, FluentFontIcon("\ue943"), "样式表", FluentFontIcon("\ue943"))
         self.navigationInterface.addItem(
             routeKey='Help',
-            icon=FIF.HELP,
+            icon=FluentFontIcon("\uea6b"),
             text='帮助',
             onClick=self.onHelpBtn,
             selectable=False,
             position=NavigationItemPosition.BOTTOM,
         )
-        self.addSubInterface(self.aboutInterface, FIF.INFO, '关于', FIF.INFO, NavigationItemPosition.BOTTOM)
-        self.navigationInterface.setCurrentItem(self.homeInterface.objectName())
+        self.addSubInterface(self.aboutInterface, FluentFontIcon("\ue946"), '关于', FluentFontIcon("\uf167"), NavigationItemPosition.BOTTOM)
+        self.navigationInterface.setCurrentItem(self.workspaceInterface.objectName())
 
         self.splashScreen.finish()
 

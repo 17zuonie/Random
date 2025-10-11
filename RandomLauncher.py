@@ -23,8 +23,8 @@ class Ui_MessageBox:
         self.contentLabel = BodyLabel(content, parent)
 
         self.buttonGroup = QFrame(parent)
-        self.yesButton = PrimaryPushButton(self.tr('OK'), self.buttonGroup)
-        self.cancelButton = QPushButton(self.tr('Cancel'), self.buttonGroup)
+        self.yesButton = PrimaryPushButton("确定", self.buttonGroup)
+        self.cancelButton = QPushButton("取消", self.buttonGroup)
 
         self.vBoxLayout = QVBoxLayout(parent)
         self.textLayout = QVBoxLayout()

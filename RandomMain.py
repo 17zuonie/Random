@@ -15,13 +15,13 @@ from darkdetect import isDark
 from ctypes.wintypes import MSG
 from ctypes import windll, byref
 from win32con import MOD_CONTROL, MOD_SHIFT, MOD_ALT
-from PyQt5.QtGui import QIcon, QMouseEvent, QCursor
-from PyQt5.QtCore import Qt, QTimer, QDateTime, pyqtSignal, QThread, QFile, QPropertyAnimation
+from PyQt5.QtGui import QIcon, QMouseEvent, QCursor, QDesktopServices
+from PyQt5.QtCore import Qt, QTimer, QDateTime, pyqtSignal, QThread, QFile, QPropertyAnimation, QUrl
 from PyQt5.QtWidgets import QAction, QPushButton, QVBoxLayout, QSystemTrayIcon, QWidget, QApplication, QHBoxLayout, \
     QLabel, QFrame
-from qfluentwidgets import RoundMenu, setTheme, Theme, BodyLabel, PrimaryPushButton, TextWrap, FluentStyleSheet
+from qfluentwidgets import RoundMenu, setTheme, Theme, BodyLabel, PrimaryPushButton, TextWrap, FluentStyleSheet, \
+    FluentFontIconBase
 from qframelesswindow import FramelessDialog
-from qfluentwidgets import FluentIcon as FIF
 
 
 def windowEnumerationHandler(hwnd, windowlist):
@@ -44,6 +44,12 @@ class Mutex:
             portalocker.unlock(self.file)
             self.file.close()
             os.remove('RandomMain.lockfile')
+
+
+class FluentFontIcon(FluentFontIconBase):
+
+    def path(self, theme=Theme.AUTO):
+        return "Font/SegoeIcons.ttf"
 
 
 class Ui_MessageBox:
@@ -386,15 +392,15 @@ class Main(QWidget):
 
     def trayIconActivated(self, reason):
         if reason == QSystemTrayIcon.ActivationReason.Trigger or reason == QSystemTrayIcon.ActivationReason.Context:
-            self._tray_icon_menu.exec(QCursor.pos())
+            self._tray_icon_menu.exec(self.tray_icon.geometry().center())
 
     def createActions(self):
-        self._setting_action = QAction(FIF.SETTING.icon(), "设置", self)
-        self._help_action = QAction(FIF.HELP.icon(), "帮助", self)
+        self._setting_action = QAction(FluentFontIcon("\ue713").icon(), "设置", self)
+        self._help_action = QAction(FluentFontIcon("\uea6b").icon(), "帮助", self)
         self._setting_action.triggered.connect(lambda: subprocess.Popen("RandomSetting.exe", shell=True))
         self._help_action.triggered.connect(lambda: os.startfile(os.path.abspath("./Doc/RandomHelp.html")))
 
-        self._reset_action = QAction(FIF.CANCEL.icon(), "复位", self)
+        self._reset_action = QAction(FluentFontIcon("\ue845").icon(), "复位", self)
         self._topleft_action = QAction("左上", self)
         self._topcenter_action = QAction("上中", self)
         self._topright_action = QAction("右上", self)
@@ -413,26 +419,30 @@ class Main(QWidget):
         hideShortCut = self.hideHotKey if cfg.EnableHideHotKey.value else ""
         showShortCut = self.showHotKey if cfg.EnableShowHotKey.value else ""
         screenShotShortCut = self.screenShotHotKey if cfg.EnableScreenShotHotKey.value else ""
-        self._run_action = QAction(FIF.SEND.icon(), "生成随机数", shortcut=runShortCut, parent=self)
-        self._hide_action = QAction(FIF.REMOVE_FROM.icon(), "隐藏", shortcut=hideShortCut, parent=self)
-        self._restore_action = QAction(FIF.ADD_TO.icon(), "显示", shortcut=showShortCut, parent=self)
+        self._run_action = QAction(FluentFontIcon("\ue724").icon(), "生成随机数", shortcut=runShortCut, parent=self)
+        self._hide_action = QAction(FluentFontIcon("\uecc9").icon(), "隐藏", shortcut=hideShortCut, parent=self)
+        self._restore_action = QAction(FluentFontIcon("\uecc8").icon(), "显示", shortcut=showShortCut, parent=self)
         self._run_action.triggered.connect(self.run)
         self._hide_action.triggered.connect(self.hide)
         self._restore_action.triggered.connect(self.restoreFromTray)
 
-        self._capture_screen_action = QAction(FIF.CAMERA.icon(), "屏幕快照", shortcut=screenShotShortCut, parent=self)
+        self._capture_screen_action = QAction(FluentFontIcon("\ue722").icon(), "屏幕快照", shortcut=screenShotShortCut, parent=self)
         self._capture_screen_action.triggered.connect(self.captureScreen)
+        self._open_screenshot_path = QAction(FluentFontIcon("\ue838").icon(), "打开文件夹", parent=self)
+        self._open_screenshot_path.triggered.connect(self.openScreenshotPath)
 
-        self._quit_action = QAction(FIF.CLOSE.icon(), "退出", self)
+        self._quit_action = QAction(FluentFontIcon("\ue7e8").icon(), "退出", self)
         self._quit_action.triggered.connect(self.quit)
 
     def createTrayIcon(self):
         self.subMenu = RoundMenu("移动")
-        self.subMenu.setIcon(FIF.MOVE)
+        self.subMenu.setIcon(FluentFontIcon("\ue7c2"))
         self.subMenu.addActions([self._topleft_action, self._topcenter_action, self._topright_action, self._bottomleft_action, self._bottomcenter_action, self._bottomright_action])
 
         self._tray_icon_menu.addAction(self._run_action)
+        self._tray_icon_menu.addSeparator()
         self._tray_icon_menu.addAction(self._capture_screen_action)
+        self._tray_icon_menu.addAction(self._open_screenshot_path)
         self._tray_icon_menu.addSeparator()
         self._tray_icon_menu.addAction(self._reset_action)
         self._tray_icon_menu.addMenu(self.subMenu)
@@ -541,12 +551,26 @@ class Main(QWidget):
                 break
 
     def captureScreen(self):
+        if cfg.IsAutoHide.value:
+            self.hide()
         with mss.mss() as sct:
             monitor = sct.monitors[0]
             screenshot = sct.grab(monitor)
+
             fileName = QDateTime.currentDateTime().toString('yyyyMMddhhmmsszzz') + ".png"
             path = os.path.join(cfg.ScreenShotPath.value, fileName)
+            if not os.path.exists(cfg.ScreenShotPath.value):
+                os.makedirs(cfg.ScreenShotPath.value, exist_ok=True)
+
             mss.tools.to_png(screenshot.rgb, screenshot.size, output=path)
+        self.show()
+
+    def openScreenshotPath(self):
+        path = cfg.ScreenShotPath.value
+        if not os.path.exists(path):
+            os.makedirs(path, exist_ok=True)
+
+        QDesktopServices.openUrl(QUrl.fromLocalFile(path))
 
 
 if __name__ == "__main__":
