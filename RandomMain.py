@@ -20,7 +20,7 @@ from PyQt5.QtCore import Qt, QTimer, QDateTime, pyqtSignal, QThread, QFile, QPro
 from PyQt5.QtWidgets import QAction, QPushButton, QVBoxLayout, QSystemTrayIcon, QWidget, QApplication, QHBoxLayout, \
     QLabel, QFrame
 from qfluentwidgets import RoundMenu, setTheme, Theme, BodyLabel, PrimaryPushButton, TextWrap, FluentStyleSheet, \
-    FluentFontIconBase
+    FluentFontIconBase, InfoBar, InfoBarPosition
 from qframelesswindow import FramelessDialog
 
 
@@ -563,6 +563,16 @@ class Main(QWidget):
                 os.makedirs(cfg.ScreenShotPath.value, exist_ok=True)
 
             mss.tools.to_png(screenshot.rgb, screenshot.size, output=path)
+
+        InfoBar.success(
+            title='截图成功',
+            content="",
+            orient=Qt.Horizontal,
+            isClosable=False,
+            duration=2000,
+            position=InfoBarPosition.TOP,
+            parent=InfoBar.desktopView()
+        )
         self.show()
 
     def openScreenshotPath(self):
