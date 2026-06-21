@@ -1,7 +1,5 @@
 <!DOCTYPE RCC><RCC version="1.0">
 <qresource prefix="/">
     <file>icon.png</file>
-    <file>BannerDark.png</file>
-    <file>BannerLight.png</file>
 </qresource>
 </RCC>

@@ -16,7 +16,7 @@ from ctypes.wintypes import MSG
 from ctypes import windll, byref
 from win32con import MOD_CONTROL, MOD_SHIFT, MOD_ALT
 from PyQt5.QtGui import QIcon, QMouseEvent, QCursor, QDesktopServices
-from PyQt5.QtCore import Qt, QTimer, QDateTime, pyqtSignal, QThread, QFile, QPropertyAnimation, QUrl
+from PyQt5.QtCore import Qt, QTimer, QDateTime, pyqtSignal, QThread, QPropertyAnimation, QUrl
 from PyQt5.QtWidgets import QAction, QPushButton, QVBoxLayout, QSystemTrayIcon, QWidget, QApplication, QHBoxLayout, \
     QLabel, QFrame
 from qfluentwidgets import RoundMenu, setTheme, Theme, BodyLabel, PrimaryPushButton, TextWrap, FluentStyleSheet, \
@@ -53,7 +53,6 @@ class FluentFontIcon(FluentFontIconBase):
 
 
 class Ui_MessageBox:
-    """ Ui of message box """
 
     yesSignal = pyqtSignal()
     cancelSignal = pyqtSignal()
@@ -140,7 +139,6 @@ class Ui_MessageBox:
         self.cancelButton.adjustSize()
 
     def setContentCopyable(self, isCopyable: bool):
-        """ set whether the content is copyable """
         if isCopyable:
             self.contentLabel.setTextInteractionFlags(
                 Qt.TextInteractionFlag.TextSelectableByMouse)
@@ -150,7 +148,6 @@ class Ui_MessageBox:
 
 
 class Dialog(FramelessDialog, Ui_MessageBox):
-    """ Dialog box """
 
     yesSignal = pyqtSignal()
     cancelSignal = pyqtSignal()
@@ -336,37 +333,27 @@ class Main(QWidget):
                 self.hotkeyManagers.append(manager)
 
     def setBtnStyleSheet(self):
-        if not cfg.EnableCustomStyleSheet.value or not os.path.exists(cfg.QssPath.value):
-            if self.theme == "Light":
-                theme = True
-            elif self.theme == "Dark":
+        if self.theme == "Light":
+            theme = True
+        elif self.theme == "Dark":
+            theme = False
+        else:
+            if isDark():
                 theme = False
             else:
-                if isDark():
-                    theme = False
-                else:
-                    theme = True
-            if theme:
-                """Light Theme"""
-                self.button.setStyleSheet(
-                    'QPushButton {background-color: rgb(249, 249, 249);color: rgb(0, 0, 0);border-radius: 16px;border: 0.5px groove gray;border-style: outset;font-family: "Microsoft YaHei";font-size: 15pt;}'
-                    'QPushButton:hover {background-color: rgba(249, 249, 249, 255);}'
-                    'QPushButton:pressed {background-color: rgba(249, 249, 249, 255);}')
-            else:
-                """Dark Theme"""
-                self.button.setStyleSheet(
-                    'QPushButton {background-color: rgb(39, 39, 39);color: rgb(255, 255, 255);border-radius: 16px;border: 0.5px groove gray;border-style: outset;font-family: "Microsoft YaHei";font-size: 15pt;}'
-                    'QPushButton:hover {background-color: rgba(39, 39, 39, 255);}'
-                    'QPushButton:pressed {background-color: rgba(39, 39, 39, 255);}')
+                theme = True
+        if theme:
+            """Light Theme"""
+            self.button.setStyleSheet(
+                'QPushButton {background-color: rgb(249, 249, 249);color: rgb(0, 0, 0);border-radius: 16px;border: 0.5px groove gray;border-style: outset;font-family: "Microsoft YaHei";font-size: 15pt;}'
+                'QPushButton:hover {background-color: rgba(249, 249, 249, 255);}'
+                'QPushButton:pressed {background-color: rgba(249, 249, 249, 255);}')
         else:
-            f = QFile(cfg.QssPath.value)
-            f.open(QFile.ReadOnly)
-            qss = str(f.readAll(), encoding='utf-8')
-            f.close()
-            self.button.setStyleSheet(qss)
-
-        if cfg.EnableCustomStyleSheet.value and not os.path.exists(cfg.QssPath.value):
-            self.showNoQssWarning()
+            """Dark Theme"""
+            self.button.setStyleSheet(
+                'QPushButton {background-color: rgb(39, 39, 39);color: rgb(255, 255, 255);border-radius: 16px;border: 0.5px groove gray;border-style: outset;font-family: "Microsoft YaHei";font-size: 15pt;}'
+                'QPushButton:hover {background-color: rgba(39, 39, 39, 255);}'
+                'QPushButton:pressed {background-color: rgba(39, 39, 39, 255);}')
 
     def moveWidget(self, position):
         if position == "TopLeft":
@@ -397,8 +384,8 @@ class Main(QWidget):
     def createActions(self):
         self._setting_action = QAction(FluentFontIcon("\ue713").icon(), "设置", self)
         self._help_action = QAction(FluentFontIcon("\uea6b").icon(), "帮助", self)
-        self._setting_action.triggered.connect(lambda: subprocess.Popen("RandomSetting.exe", shell=True))
-        self._help_action.triggered.connect(lambda: os.startfile(os.path.abspath("./Doc/RandomHelp.html")))
+        self._setting_action.triggered.connect(self._openSetting)
+        self._help_action.triggered.connect(self._openHelp)
 
         self._reset_action = QAction(FluentFontIcon("\ue845").icon(), "复位", self)
         self._topleft_action = QAction("左上", self)
@@ -504,17 +491,6 @@ class Main(QWidget):
         else:
             pass
 
-    def showNoQssWarning(self):
-        w = Dialog("错误", "样式表文件不存在，已应用默认样式。", self)
-        w.yesButton.setText("转到设置")
-        w.cancelButton.setText("取消")
-        w.setFixedWidth(300)
-        w.move(self.desktop.width() // 2 - w.width() // 2, self.desktop.height() // 2 - w.height() // 2)
-        if w.exec():
-            subprocess.Popen("RandomSetting.exe", shell=True)
-        else:
-            pass
-
     def updateTime(self):
         if not self.isOnRandom:
             self.button.setText(QDateTime.currentDateTime().toString('hh:mm'))
@@ -551,8 +527,19 @@ class Main(QWidget):
                 break
 
     def captureScreen(self):
+        WDA_EXCLUDEFROMCAPTURE = 0x00000011
+        hwnd = int(self.winId())
+
+        affinity_ok = False
         if cfg.IsAutoHide.value:
-            self.hide()
+            try:
+                affinity_ok = bool(windll.user32.SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE))
+            except Exception:
+                affinity_ok = False
+            if not affinity_ok:
+                self.hide()
+                QApplication.processEvents()
+
         with mss.mss() as sct:
             monitor = sct.monitors[0]
             screenshot = sct.grab(monitor)
@@ -564,6 +551,12 @@ class Main(QWidget):
 
             mss.tools.to_png(screenshot.rgb, screenshot.size, output=path)
 
+        if cfg.IsAutoHide.value:
+            if affinity_ok:
+                windll.user32.SetWindowDisplayAffinity(hwnd, 0)
+            else:
+                self.show()
+
         InfoBar.success(
             title='截图成功',
             content="",
@@ -573,7 +566,29 @@ class Main(QWidget):
             position=InfoBarPosition.TOP,
             parent=InfoBar.desktopView()
         )
-        self.show()
+
+    def _restoreTopMost(self):
+        try:
+            hwnd = int(self.winId())
+            HWND_TOPMOST = -1
+            SWP_NOMOVE = 0x0002
+            SWP_NOSIZE = 0x0001
+            SWP_NOACTIVATE = 0x0010
+            SWP_SHOWWINDOW = 0x0040
+            windll.user32.SetWindowPos(
+                hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW
+            )
+        except Exception:
+            pass
+
+    def _openSetting(self):
+        subprocess.Popen("RandomSetting.exe", shell=True)
+        QTimer.singleShot(100, self._restoreTopMost)
+
+    def _openHelp(self):
+        os.startfile(os.path.abspath("./Doc/RandomHelp.html"))
+        QTimer.singleShot(100, self._restoreTopMost)
 
     def openScreenshotPath(self):
         path = cfg.ScreenShotPath.value
@@ -581,6 +596,7 @@ class Main(QWidget):
             os.makedirs(path, exist_ok=True)
 
         QDesktopServices.openUrl(QUrl.fromLocalFile(path))
+        QTimer.singleShot(100, self._restoreTopMost)
 
 
 if __name__ == "__main__":

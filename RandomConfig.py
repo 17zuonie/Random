@@ -9,18 +9,15 @@ class Config(QConfig):
     Value = RangeConfigItem("MainWindow", "Value", 40, RangeValidator(2, 999))
     NoRepeat = ConfigItem("MainWindow", "NoRepeat", True, BoolValidator())
     Theme = OptionsConfigItem("MainWindow", "Theme", "Auto", OptionsValidator(["Light", "Dark", "Auto"]))
-    EnableCustomStyleSheet = ConfigItem("MainWindow", "EnableCustomStyleSheet", False, BoolValidator())
-    QssPath = ConfigItem("MainWindow", "QssPath", os.path.join(os.path.expanduser('~'), '.Random', 'qss', 'demo.qss'), ConfigValidator())
-
     Opacity = RangeConfigItem("MainWindow", "Opacity", 75, RangeValidator(1, 100))
     AutoRun = ConfigItem("MainWindow", "AutoRun", True, BoolValidator())
     ShowTime = ConfigItem("MainWindow", "ShowTime", True, BoolValidator())
     dpiScale = OptionsConfigItem("MainWindow", "DpiScale", "Auto", OptionsValidator([1, 1.25, 1.5, 1.75, 2, "Auto"]), restart=True)
     Position = OptionsConfigItem("MainWindow", "Position", "TopLeft", OptionsValidator(["TopLeft", "TopCenter", "TopRight", "BottomLeft", "BottomCenter", "BottomRight"]))
-    TopMargin = RangeConfigItem("MainWindow", "TopMargin", 50, RangeValidator(0, 1920))
-    BottomMargin = RangeConfigItem("MainWindow", "BottomMargin", 50, RangeValidator(0, 1920))
-    LeftMargin = RangeConfigItem("MainWindow", "LeftMargin", 10, RangeValidator(0, 1080))
-    RightMargin = RangeConfigItem("MainWindow", "RightMargin", 10, RangeValidator(0, 1080))
+    TopMargin = RangeConfigItem("MainWindow", "TopMargin", 58, RangeValidator(0, 1920))
+    BottomMargin = RangeConfigItem("MainWindow", "BottomMargin", 58, RangeValidator(0, 1920))
+    LeftMargin = RangeConfigItem("MainWindow", "LeftMargin", 18, RangeValidator(0, 1080))
+    RightMargin = RangeConfigItem("MainWindow", "RightMargin", 18, RangeValidator(0, 1080))
     IsAutoHide = ConfigItem("MainWindow", "IsAutoHide", True, BoolValidator())
     ScreenShotPath = ConfigItem("MainWindow", "ScreenShotPath", os.path.join(os.path.expanduser('~'), '.Random', 'ScreenShot'), ConfigValidator())
     RunHotKey = ConfigItem("MainWindow", "RunHotKey", "Ctrl+F1", ConfigValidator())
@@ -33,7 +30,6 @@ class Config(QConfig):
     EnableScreenShotHotKey = ConfigItem("MainWindow", "EnableScreenShotHotKey", True, BoolValidator())
 
 
-YEAR = "2026"
-VERSION = "5.3.4"
+VERSION = "5.4.0"
 cfg = Config()
 qconfig.load(os.path.join(os.path.expanduser('~'), '.Random', 'config', 'config.json'), cfg)
