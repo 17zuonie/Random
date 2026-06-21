@@ -595,20 +595,20 @@ class ColorPickerFlyoutView(FlyoutViewBase):
 
         if isDarkTheme():
             labelColor = 'white'
-            handleBorder = 'rgb(100, 100, 100)'
+            handleBorder = 'rgb(55, 55, 55)'
             handleInner1 = 'rgb(255, 255, 255)'
             handleInner2 = 'rgb(255, 255, 255)'
-            grooveDisabled = 'rgba(255, 255, 255, 75)'
-            handleDisabledBg = '#606060'
-            handleDisabledBorder = '#909090'
+            handleInner3 = 'rgb(69, 69, 69)'
+            handleInner4 = 'rgb(69, 69, 69)'
+            grooveDisabled = 'rgba(0, 0, 0, 75)'
         else:
             labelColor = 'black'
             handleBorder = 'rgb(222, 222, 222)'
             handleInner1 = 'rgb(0, 0, 0)'
             handleInner2 = 'rgb(0, 0, 0)'
+            handleInner3 = 'rgb(255, 255, 255)'
+            handleInner4 = 'rgb(255, 255, 255)'
             grooveDisabled = 'rgba(0, 0, 0, 75)'
-            handleDisabledBg = '#808080'
-            handleDisabledBorder = '#cccccc'
 
         qss = f"""
             ColorDialog, QScrollArea, QWidget {{
@@ -652,15 +652,15 @@ class ColorPickerFlyoutView(FlyoutViewBase):
                 background-color: qradialgradient(spread:pad, cx:0.5, cy:0.5, radius:0.5, fx:0.5, fy:0.5,
                     stop:0 {handleInner1},
                     stop:0.5 {handleInner2},
-                    stop:0.6 rgb(255, 255, 255),
-                    stop:1 rgb(255, 255, 255));
+                    stop:0.6 {handleInner3},
+                    stop:1 {handleInner4});
             }}
             QSlider::groove:horizontal:disabled {{
                 background-color: {grooveDisabled};
             }}
             QSlider::handle:horizontal:disabled {{
-                background-color: {handleDisabledBg};
-                border: 6px solid {handleDisabledBorder};
+                background-color: #808080;
+                border: 6px solid #cccccc;
             }}
         """
         self.setStyleSheet(qss)
