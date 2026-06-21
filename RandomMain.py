@@ -15,7 +15,7 @@ from darkdetect import isDark
 from ctypes.wintypes import MSG
 from ctypes import windll, byref
 from win32con import MOD_CONTROL, MOD_SHIFT, MOD_ALT
-from PyQt5.QtGui import QIcon, QMouseEvent, QCursor, QDesktopServices
+from PyQt5.QtGui import QIcon, QMouseEvent, QCursor, QDesktopServices, QColor
 from PyQt5.QtCore import Qt, QTimer, QDateTime, pyqtSignal, QThread, QPropertyAnimation, QUrl
 from PyQt5.QtWidgets import QAction, QPushButton, QVBoxLayout, QSystemTrayIcon, QWidget, QApplication, QHBoxLayout, \
     QLabel, QFrame
@@ -230,7 +230,6 @@ class Main(QWidget):
         super().__init__()
         self.value = cfg.Value.value
         self.opacity = cfg.Opacity.value / 100
-        self.theme = cfg.Theme.value
         self.noRepeat = cfg.NoRepeat.value
         self.position = cfg.Position.value
         self.isShowTime = cfg.ShowTime.value
@@ -333,27 +332,39 @@ class Main(QWidget):
                 self.hotkeyManagers.append(manager)
 
     def setBtnStyleSheet(self):
-        if self.theme == "Light":
-            theme = True
-        elif self.theme == "Dark":
-            theme = False
-        else:
-            if isDark():
-                theme = False
-            else:
-                theme = True
-        if theme:
-            """Light Theme"""
-            self.button.setStyleSheet(
-                'QPushButton {background-color: rgb(249, 249, 249);color: rgb(0, 0, 0);border-radius: 16px;border: 0.5px groove gray;border-style: outset;font-family: "Microsoft YaHei";font-size: 15pt;}'
-                'QPushButton:hover {background-color: rgba(249, 249, 249, 255);}'
-                'QPushButton:pressed {background-color: rgba(249, 249, 249, 255);}')
-        else:
-            """Dark Theme"""
-            self.button.setStyleSheet(
-                'QPushButton {background-color: rgb(39, 39, 39);color: rgb(255, 255, 255);border-radius: 16px;border: 0.5px groove gray;border-style: outset;font-family: "Microsoft YaHei";font-size: 15pt;}'
-                'QPushButton:hover {background-color: rgba(39, 39, 39, 255);}'
-                'QPushButton:pressed {background-color: rgba(39, 39, 39, 255);}')
+        startColor = QColor(cfg.ButtonColorStart.value)
+        endColor = QColor(cfg.ButtonColorEnd.value)
+
+        midR = (startColor.red() + endColor.red()) / 2
+        midG = (startColor.green() + endColor.green()) / 2
+        midB = (startColor.blue() + endColor.blue()) / 2
+
+        luminance = 0.299 * midR + 0.587 * midG + 0.114 * midB
+        textColor = "rgb(0, 0, 0)" if luminance > 128 else "rgb(255, 255, 255)"
+
+        startHex = startColor.name()
+        endHex = endColor.name()
+
+        self.button.setStyleSheet(
+            f'QPushButton {{'
+            f'background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, '
+            f'stop:0 {startHex}, stop:1 {endHex});'
+            f'color: {textColor};'
+            f'border-radius: 16px;'
+            f'border: 0.5px groove gray;'
+            f'border-style: outset;'
+            f'font-family: "Microsoft YaHei";'
+            f'font-size: 15pt;'
+            f'}}'
+            f'QPushButton:hover {{'
+            f'background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, '
+            f'stop:0 {startHex}, stop:1 {endHex});'
+            f'}}'
+            f'QPushButton:pressed {{'
+            f'background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, '
+            f'stop:0 {startHex}, stop:1 {endHex});'
+            f'}}'
+        )
 
     def moveWidget(self, position):
         if position == "TopLeft":

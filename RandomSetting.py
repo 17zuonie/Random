@@ -15,13 +15,14 @@ from PyQt5.QtCore import Qt, pyqtSignal, QRectF, QEasingCurve, QEvent, QTimer, Q
     QThreadPool, QUrl
 from PyQt5.QtGui import QColor, QIcon, QPainter, QTextCursor, QPainterPath, QKeySequence, QDesktopServices
 from PyQt5.QtWidgets import QFrame, QApplication, QWidget, QHBoxLayout, QLabel, QVBoxLayout, QPushButton, \
-    QTextEdit, QLineEdit, QSpinBox, QScrollArea, QScroller, QAction, QFileDialog, QCompleter, QSizePolicy
+    QTextEdit, QLineEdit, QSpinBox, QScrollArea, QScroller, QAction, QFileDialog, QCompleter, QSizePolicy, QButtonGroup
 from qfluentwidgets import NavigationItemPosition, SubtitleLabel, MessageBox, ExpandLayout, MaskDialogBase, \
     SettingCardGroup, ComboBox, SwitchButton, IndicatorPosition, qconfig, TextWrap, InfoBarIcon, PrimaryPushButton, \
     isDarkTheme, ConfigItem, OptionsConfigItem, FluentStyleSheet, HyperlinkButton, IconWidget, drawIcon, \
-    setThemeColor, SmoothScrollDelegate, setFont, themeColor, setTheme, Theme, qrouter, NavigationBar, \
+    setThemeColor, SmoothScrollDelegate, setFont, themeColor, setTheme, Theme, qrouter, NavigationBar, CheckBox, \
     NavigationBarPushButton, SplashScreen, Slider, OptionsSettingCard, InfoBar, TransparentToolButton, BodyLabel, \
-    InfoBarPosition, CheckBox, ExpandSettingCard, ToolTipFilter, ToolTipPosition, FluentFontIconBase
+    InfoBarPosition, ExpandSettingCard, ToolTipFilter, ToolTipPosition, FluentFontIconBase, ExpandGroupSettingCard, \
+    ColorConfigItem, RadioButton, FlyoutViewBase, Flyout, FlyoutAnimationType, ClickableSlider
 from qfluentwidgets.components.widgets.line_edit import LineEditButton, CompleterMenu
 from qfluentwidgets.components.widgets.menu import MenuAnimationType, RoundMenu
 from qfluentwidgets.components.widgets.spin_box import SpinButton, SpinIcon
@@ -29,6 +30,7 @@ from qfluentwidgets.window.fluent_window import FluentWindowBase
 from qframelesswindow.titlebar import MinimizeButton, CloseButton, MaximizeButton
 from qframelesswindow import TitleBarButton
 from qframelesswindow.utils import startSystemMove
+from qfluentwidgets.components.dialog_box.color_dialog import HuePanel, HexColorLineEdit
 
 
 class Mutex:
@@ -502,6 +504,266 @@ class SettingIconWidget(IconWidget):
         drawIcon(self._icon, painter, self.rect())
 
 
+class BrightnessSlider(ClickableSlider):
+
+    colorChanged = pyqtSignal(QColor)
+
+    def __init__(self, color, parent=None):
+        super().__init__(Qt.Horizontal, parent)
+        self.setRange(0, 255)
+        self.setColor(color)
+        self.valueChanged.connect(self.__onValueChanged)
+
+    def setColor(self, color):
+        self.color = QColor(color)
+        self.setValue(self.color.value())
+
+    def __onValueChanged(self, value):
+        self.color.setHsv(self.color.hue(), self.color.saturation(), value, self.color.alpha())
+        self.colorChanged.emit(self.color)
+
+
+class ColorPickerFlyoutView(FlyoutViewBase):
+
+    colorChanged = pyqtSignal(QColor)
+
+    def __init__(self, color, parent=None):
+        super().__init__(parent)
+        color = QColor(color)
+        color.setAlpha(255)
+
+        self.oldColor = QColor(color)
+        self.color = QColor(color)
+
+        self.huePanel = HuePanel(color, self)
+        self.brightSlider = BrightnessSlider(color, self)
+
+        self.editLabel = QLabel('编辑颜色', self)
+        self.hexLineEdit = HexColorLineEdit(color, self, False)
+
+        self.buttonContainer = QWidget(self)
+        self.buttonLayout = QHBoxLayout(self.buttonContainer)
+        self.yesButton = TransparentToolButton(FluentFontIcon("\ue73e"), self.buttonContainer)
+        self.cancelButton = TransparentToolButton(FluentFontIcon("\ue711"), self.buttonContainer)
+
+        self._viewWidget = None
+
+        self.__initWidget()
+
+    def __initWidget(self):
+        self.vBoxLayout = QVBoxLayout(self)
+        self.vBoxLayout.setSpacing(0)
+        self.vBoxLayout.setAlignment(Qt.AlignTop)
+        self.vBoxLayout.setContentsMargins(12, 8, 12, 0)
+
+        self.pickerWidget = QWidget(self)
+        self.pickerWidget.setFixedSize(256, 360)
+        self.huePanel.setParent(self.pickerWidget)
+        self.brightSlider.setParent(self.pickerWidget)
+        self.editLabel.setParent(self.pickerWidget)
+        self.hexLineEdit.setParent(self.pickerWidget)
+
+        self.huePanel.move(0, 0)
+        self.huePanel.setFixedSize(256, 256)
+        self.brightSlider.move(0, 262)
+        self.brightSlider.setFixedSize(256, 36)
+        self.editLabel.move(0, 318)
+        self.hexLineEdit.setFixedWidth(120)
+        self.hexLineEdit.move(130, 314)
+
+        self.buttonContainer.setFixedSize(256, 56)
+        self.buttonLayout.setContentsMargins(0, 10, 0, 10)
+        self.buttonLayout.setSpacing(12)
+        self.yesButton.setFixedHeight(36)
+        self.cancelButton.setFixedHeight(36)
+        self.yesButton.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.cancelButton.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.buttonLayout.addWidget(self.yesButton, 1)
+        self.buttonLayout.addWidget(self.cancelButton, 1)
+
+        self.vBoxLayout.addWidget(self.pickerWidget)
+        self.vBoxLayout.addWidget(self.buttonContainer, 0, Qt.AlignBottom)
+
+        self.__setQss()
+        self.__connectSignalToSlot()
+
+    def __setQss(self):
+        from qfluentwidgets.common.style_sheet import isDarkTheme
+        self.editLabel.setObjectName('editLabel')
+        hue = str(self.color.hue())
+        sat = str(self.color.saturation())
+
+        if isDarkTheme():
+            labelColor = 'white'
+            handleBorder = 'rgb(100, 100, 100)'
+            handleInner1 = 'rgb(255, 255, 255)'
+            handleInner2 = 'rgb(255, 255, 255)'
+            grooveDisabled = 'rgba(255, 255, 255, 75)'
+            handleDisabledBg = '#606060'
+            handleDisabledBorder = '#909090'
+        else:
+            labelColor = 'black'
+            handleBorder = 'rgb(222, 222, 222)'
+            handleInner1 = 'rgb(0, 0, 0)'
+            handleInner2 = 'rgb(0, 0, 0)'
+            grooveDisabled = 'rgba(0, 0, 0, 75)'
+            handleDisabledBg = '#808080'
+            handleDisabledBorder = '#cccccc'
+
+        qss = f"""
+            ColorDialog, QScrollArea, QWidget {{
+                background-color: transparent;
+            }}
+            QScrollArea {{
+                border: 1px solid transparent;
+                border-radius: 8px;
+                background-color: transparent;
+            }}
+            QLabel {{
+                font: 14px 'Segoe UI', 'Microsoft YaHei', 'PingFang SC';
+                color: {labelColor};
+                background-color: transparent;
+                border: none;
+            }}
+            #editLabel {{
+                font-size: 16px;
+            }}
+            #prefixLabel, #suffixLabel {{
+                padding: 0;
+                font-size: 14px;
+            }}
+            QSlider:horizontal {{
+                min-width: 0px;
+                min-height: 0px;
+            }}
+            QSlider::groove:horizontal {{
+                height: 12px;
+                border-radius: 6px;
+                background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0,
+                    stop:0 hsv({hue}, {sat}, 0),
+                    stop:1 hsv({hue}, {sat}, 255));
+            }}
+            QSlider::handle:horizontal {{
+                border: 1px solid {handleBorder};
+                width: 16px;
+                min-height: 10px;
+                margin: -3px 0;
+                border-radius: 9px;
+                background-color: qradialgradient(spread:pad, cx:0.5, cy:0.5, radius:0.5, fx:0.5, fy:0.5,
+                    stop:0 {handleInner1},
+                    stop:0.5 {handleInner2},
+                    stop:0.6 rgb(255, 255, 255),
+                    stop:1 rgb(255, 255, 255));
+            }}
+            QSlider::groove:horizontal:disabled {{
+                background-color: {grooveDisabled};
+            }}
+            QSlider::handle:horizontal:disabled {{
+                background-color: {handleDisabledBg};
+                border: 6px solid {handleDisabledBorder};
+            }}
+        """
+        self.setStyleSheet(qss)
+        self.editLabel.adjustSize()
+
+    def setColor(self, color, movePicker=True):
+        self.color = QColor(color)
+        self.brightSlider.setColor(color)
+        self.hexLineEdit.setColor(color)
+        if movePicker:
+            self.huePanel.setColor(color)
+        # 颜色变化时重新设置 QSS 更新 groove 渐变色
+        self.__setQss()
+
+    def __onHueChanged(self, color):
+        self.color.setHsv(color.hue(), color.saturation(), self.color.value(), 255)
+        self.setColor(self.color)
+
+    def __onBrightnessChanged(self, color):
+        self.color.setHsv(
+            self.color.hue(), self.color.saturation(), color.value(), 255)
+        self.setColor(self.color, False)
+
+    def __onHexColorChanged(self, color):
+        self.color.setNamedColor("#" + color)
+        self.color.setAlpha(255)
+        self.setColor(self.color)
+
+    def __onYesButtonClicked(self):
+        if self.color != self.oldColor:
+            self.colorChanged.emit(self.color)
+        if self._viewWidget:
+            self._viewWidget.close()
+
+    def __onCancelButtonClicked(self):
+        if self._viewWidget:
+            self._viewWidget.close()
+
+    def __connectSignalToSlot(self):
+        self.cancelButton.clicked.connect(self.__onCancelButtonClicked)
+        self.yesButton.clicked.connect(self.__onYesButtonClicked)
+
+        self.huePanel.colorChanged.connect(self.__onHueChanged)
+        self.brightSlider.colorChanged.connect(self.__onBrightnessChanged)
+        self.hexLineEdit.valueChanged.connect(self.__onHexColorChanged)
+
+
+class DropDownColorPicker(QPushButton):
+
+    colorChanged = pyqtSignal(QColor)
+
+    def __init__(self, color: Union[str, QColor], parent=None):
+        super().__init__(parent)
+        self.color = QColor(color)
+        self.color.setAlpha(255)
+        self.setFixedSize(56, 32)
+        self.setObjectName('dropDownColorPicker')
+        self.clicked.connect(self._showColorFlyout)
+
+    def setColor(self, color: Union[str, QColor]):
+        self.color = QColor(color)
+        self.color.setAlpha(255)
+        self.update()
+
+    def getColor(self) -> QColor:
+        return QColor(self.color)
+
+    def paintEvent(self, e):
+        super().paintEvent(e)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        swatchSize = 22
+        marginY = (self.height() - swatchSize) // 2
+        swatchRect = QRectF(8, marginY, swatchSize, swatchSize)
+
+        path = QPainterPath()
+        path.addRoundedRect(swatchRect, 4, 4)
+        painter.fillPath(path, self.color)
+        painter.setPen(QColor(0, 0, 0, 30))
+        painter.drawRoundedRect(swatchRect, 4, 4)
+
+        iconSize = 12
+        iconX = self.width() - iconSize - 6
+        iconY = (self.height() - iconSize) // 2
+        icon = FluentFontIcon("\ue70d").icon()
+        icon.paint(painter, int(iconX), int(iconY), iconSize, iconSize, Qt.AlignCenter, QIcon.Normal, QIcon.On)
+
+        painter.end()
+
+    def _showColorFlyout(self):
+        view = ColorPickerFlyoutView(self.color)
+        view.colorChanged.connect(self._onColorChanged)
+        flyout = Flyout.make(view, self, self.window(), aniType=FlyoutAnimationType.SLIDE_LEFT)
+        view._viewWidget = flyout
+
+    def _onColorChanged(self, color: QColor):
+        self.color = QColor(color)
+        self.color.setAlpha(255)
+        self.update()
+        self.colorChanged.emit(self.color)
+
+
 class SettingCard(QFrame):
     def __init__(self, icon: Union[str, QIcon], title, content=None, parent=None):
         super().__init__(parent=parent)
@@ -718,6 +980,237 @@ class CustomScreenMarginSettingCard(ExpandSettingCard):
         self.bottomMargin.spinBox.setValue(cfg.BottomMargin.value)
         self.leftMargin.spinBox.setValue(cfg.LeftMargin.value)
         self.rightMargin.spinBox.setValue(cfg.RightMargin.value)
+
+
+class CustomColorSettingCard(ExpandGroupSettingCard):
+
+    colorChanged = pyqtSignal(QColor)
+
+    def __init__(self, configItem: ColorConfigItem, icon: Union[str, QIcon], title: str,
+                 content=None, parent=None, enableAlpha=False):
+        super().__init__(icon, title, content, parent=parent)
+        self.enableAlpha = enableAlpha
+        self.configItem = configItem
+        self.defaultColor = QColor(configItem.defaultValue)
+        self.customColor = QColor(qconfig.get(configItem))
+
+        self.choiceLabel = QLabel(self)
+
+        self.radioWidget = QWidget(self.view)
+        self.radioLayout = QVBoxLayout(self.radioWidget)
+        self.defaultRadioButton = RadioButton("默认颜色", self.radioWidget)
+        self.customRadioButton = RadioButton("自定义颜色", self.radioWidget)
+        self.buttonGroup = QButtonGroup(self)
+
+        self.customColorWidget = QWidget(self.view)
+        self.customColorLayout = QHBoxLayout(self.customColorWidget)
+        self.customLabel = QLabel("自定义颜色", self.customColorWidget)
+        self.chooseColorButton = DropDownColorPicker(qconfig.get(configItem), self.customColorWidget)
+
+        self.__initWidget()
+
+    def __initWidget(self):
+        self.__initLayout()
+
+        if self.defaultColor != self.customColor:
+            self.customRadioButton.setChecked(True)
+            self.chooseColorButton.setEnabled(True)
+        else:
+            self.defaultRadioButton.setChecked(True)
+            self.chooseColorButton.setEnabled(False)
+
+        self.choiceLabel.setText(self.buttonGroup.checkedButton().text())
+        self.choiceLabel.adjustSize()
+
+        self.choiceLabel.setObjectName("titleLabel")
+        self.customLabel.setObjectName("titleLabel")
+        self.chooseColorButton.setObjectName('chooseColorButton')
+
+        self.buttonGroup.buttonClicked.connect(self.__onRadioButtonClicked)
+        self.chooseColorButton.colorChanged.connect(self.__onCustomColorChanged)
+
+    def __initLayout(self):
+        self.addWidget(self.choiceLabel)
+
+        self.radioLayout.setSpacing(19)
+        self.radioLayout.setAlignment(Qt.AlignTop)
+        self.radioLayout.setContentsMargins(48, 18, 0, 18)
+        self.buttonGroup.addButton(self.customRadioButton)
+        self.buttonGroup.addButton(self.defaultRadioButton)
+        self.radioLayout.addWidget(self.customRadioButton)
+        self.radioLayout.addWidget(self.defaultRadioButton)
+        self.radioLayout.setSizeConstraint(QVBoxLayout.SetMinimumSize)
+
+        self.customColorLayout.setContentsMargins(48, 18, 44, 18)
+        self.customColorLayout.addWidget(self.customLabel, 0, Qt.AlignLeft)
+        self.customColorLayout.addWidget(self.chooseColorButton, 0, Qt.AlignRight)
+        self.customColorLayout.setSizeConstraint(QHBoxLayout.SetMinimumSize)
+
+        self.viewLayout.setSpacing(0)
+        self.viewLayout.setContentsMargins(0, 0, 0, 0)
+        self.addGroupWidget(self.radioWidget)
+        self.addGroupWidget(self.customColorWidget)
+
+    def __onRadioButtonClicked(self, button: RadioButton):
+        if button.text() == self.choiceLabel.text():
+            return
+
+        self.choiceLabel.setText(button.text())
+        self.choiceLabel.adjustSize()
+
+        if button is self.defaultRadioButton:
+            self.chooseColorButton.setDisabled(True)
+            self.chooseColorButton.setColor(self.defaultColor)
+            qconfig.set(self.configItem, self.defaultColor)
+            if self.defaultColor != self.customColor:
+                self.colorChanged.emit(self.defaultColor)
+        else:
+            self.chooseColorButton.setDisabled(False)
+            self.chooseColorButton.setColor(self.customColor)
+            qconfig.set(self.configItem, self.customColor)
+            if self.defaultColor != self.customColor:
+                self.colorChanged.emit(self.customColor)
+
+    def __onCustomColorChanged(self, color):
+        qconfig.set(self.configItem, color)
+        self.customColor = QColor(color)
+        self.colorChanged.emit(color)
+
+
+class ColorSettingItem(QWidget):
+
+    def __init__(self, label: str, hexValue: str, parent=None):
+        super().__init__(parent=parent)
+        self.labelText = label
+        self.color = QColor(hexValue)
+
+        self.hBoxLayout = QHBoxLayout(self)
+        self.titleLabel = BodyLabel(label, self)
+        self.colorPicker = DropDownColorPicker(hexValue, self)
+
+        self.hBoxLayout.setContentsMargins(48, 10, 44, 10)
+        self.hBoxLayout.addWidget(self.titleLabel, 0, Qt.AlignLeft)
+        self.hBoxLayout.addStretch(1)
+        self.hBoxLayout.addWidget(self.colorPicker, 0, Qt.AlignRight)
+
+        self.titleLabel.setObjectName("titleLabel")
+
+    def setColor(self, hexValue: str):
+        self.color = QColor(hexValue)
+        self.colorPicker.setColor(hexValue)
+
+    def getHex(self) -> str:
+        return self.colorPicker.getColor().name().upper()
+
+
+class CustomGradientColorSettingCard(ExpandGroupSettingCard):
+
+    colorChanged = pyqtSignal(str, str)  # startHex, endHex
+
+    def __init__(self, startConfigItem: ConfigItem, endConfigItem: ConfigItem,
+                 defaultStart: str, defaultEnd: str, icon: Union[str, QIcon],
+                 title: str, content=None, parent=None):
+        super().__init__(icon, title, content, parent=parent)
+        self.startConfigItem = startConfigItem
+        self.endConfigItem = endConfigItem
+        self.defaultStart = QColor(defaultStart)
+        self.defaultEnd = QColor(defaultEnd)
+
+        self.choiceLabel = QLabel(self)
+
+        self.radioWidget = QWidget(self.view)
+        self.radioLayout = QVBoxLayout(self.radioWidget)
+        self.defaultRadioButton = RadioButton("默认颜色", self.radioWidget)
+        self.customRadioButton = RadioButton("自定义颜色", self.radioWidget)
+        self.buttonGroup = QButtonGroup(self)
+
+        self.customColorWidget = QWidget(self.view)
+        self.customColorLayout = QVBoxLayout(self.customColorWidget)
+        self.customColorLayout.setSpacing(0)
+        self.customColorLayout.setContentsMargins(0, 8, 0, 8)
+
+        self.startColorItem = ColorSettingItem( "渐变起点", qconfig.get(startConfigItem), self.customColorWidget)
+        self.endColorItem = ColorSettingItem("渐变终点", qconfig.get(endConfigItem), self.customColorWidget)
+
+        self.__initWidget()
+
+    def __initWidget(self):
+        self.__initLayout()
+
+        currentStart = QColor(qconfig.get(self.startConfigItem))
+        currentEnd = QColor(qconfig.get(self.endConfigItem))
+        isCustom = (currentStart != self.defaultStart) or (currentEnd != self.defaultEnd)
+
+        if isCustom:
+            self.customRadioButton.setChecked(True)
+            self._setCustomEnabled(True)
+        else:
+            self.defaultRadioButton.setChecked(True)
+            self._setCustomEnabled(False)
+
+        self.choiceLabel.setText(self.buttonGroup.checkedButton().text())
+        self.choiceLabel.adjustSize()
+
+        self.choiceLabel.setObjectName("titleLabel")
+
+        self.buttonGroup.buttonClicked.connect(self.__onRadioButtonClicked)
+        self.startColorItem.colorPicker.colorChanged.connect(self.__onCustomColorChanged)
+        self.endColorItem.colorPicker.colorChanged.connect(self.__onCustomColorChanged)
+
+    def __initLayout(self):
+        self.addWidget(self.choiceLabel)
+
+        self.radioLayout.setSpacing(19)
+        self.radioLayout.setAlignment(Qt.AlignTop)
+        self.radioLayout.setContentsMargins(48, 18, 0, 18)
+        self.buttonGroup.addButton(self.customRadioButton)
+        self.buttonGroup.addButton(self.defaultRadioButton)
+        self.radioLayout.addWidget(self.customRadioButton)
+        self.radioLayout.addWidget(self.defaultRadioButton)
+        self.radioLayout.setSizeConstraint(QVBoxLayout.SetMinimumSize)
+
+        self.customColorLayout.addWidget(self.startColorItem)
+        self.customColorLayout.addWidget(self.endColorItem)
+
+        self.viewLayout.setSpacing(0)
+        self.viewLayout.setContentsMargins(0, 0, 0, 0)
+        self.addGroupWidget(self.radioWidget)
+        self.addGroupWidget(self.customColorWidget)
+
+    def _setCustomEnabled(self, enabled: bool):
+        self.startColorItem.colorPicker.setEnabled(enabled)
+        self.endColorItem.colorPicker.setEnabled(enabled)
+
+    def __onRadioButtonClicked(self, button: RadioButton):
+        if button.text() == self.choiceLabel.text():
+            return
+
+        self.choiceLabel.setText(button.text())
+        self.choiceLabel.adjustSize()
+
+        if button is self.defaultRadioButton:
+            self._setCustomEnabled(False)
+            startHex = self.defaultStart.name().upper()
+            endHex = self.defaultEnd.name().upper()
+            qconfig.set(self.startConfigItem, startHex)
+            qconfig.set(self.endConfigItem, endHex)
+            self.startColorItem.setColor(startHex)
+            self.endColorItem.setColor(endHex)
+            self.colorChanged.emit(startHex, endHex)
+        else:
+            self._setCustomEnabled(True)
+            startHex = self.startColorItem.getHex()
+            endHex = self.endColorItem.getHex()
+            qconfig.set(self.startConfigItem, startHex)
+            qconfig.set(self.endConfigItem, endHex)
+            self.colorChanged.emit(startHex, endHex)
+
+    def __onCustomColorChanged(self, _=None):
+        startHex = self.startColorItem.getHex()
+        endHex = self.endColorItem.getHex()
+        qconfig.set(self.startConfigItem, startHex)
+        qconfig.set(self.endConfigItem, endHex)
+        self.colorChanged.emit(startHex, endHex)
 
 
 class SwitchSettingCard(SettingCard):
@@ -971,12 +1464,14 @@ class SettingInterface(SmoothScrollArea):
         self.advanceGroup = SettingCardGroup('高级', self.scrollWidget)
         self.aboutGroup = SettingCardGroup('关于', self.scrollWidget)
 
-        self.themeCard = ComboBoxSettingCard(
-            cfg.Theme,
-            FluentFontIcon("\ue793"),
-            '主题',
+        self.colorCard = CustomGradientColorSettingCard(
+            cfg.ButtonColorStart,
+            cfg.ButtonColorEnd,
+            "#006E38",
+            "#26B773",
+            FluentFontIcon("\ue790"),
+            '颜色',
             '更改按钮的颜色主题',
-            texts=["浅色", "深色", "使用系统设置"],
             parent=self.appearanceGroup)
         self.opacityCard = RangeSettingCard(
             cfg.Opacity,
@@ -1067,7 +1562,7 @@ class SettingInterface(SmoothScrollArea):
             '检查更新',
             QIcon(':/icon.png'),
             'Random',
-            f"v{VERSION}",
+            VERSION,
             self.aboutGroup)
         self.helpCard = PrimaryPushSettingCard(
             '转到帮助',
@@ -1107,7 +1602,7 @@ class SettingInterface(SmoothScrollArea):
         self.elementGroup.addSettingCard(self.valueCard)
         self.elementGroup.addSettingCard(self.noRepeatCard)
 
-        self.appearanceGroup.addSettingCard(self.themeCard)
+        self.appearanceGroup.addSettingCard(self.colorCard)
         self.appearanceGroup.addSettingCard(self.opacityCard)
         self.actGroup.addSettingCard(self.autoRunCard)
         self.actGroup.addSettingCard(self.showTimeCard)
@@ -1145,7 +1640,15 @@ class SettingInterface(SmoothScrollArea):
         if w.exec():
             self.valueCard.setValue(40)
             self.noRepeatCard.setValue(True)
-            self.themeCard.setValue("Auto")
+            qconfig.set(cfg.ButtonColorStart, "#006E38")
+            qconfig.set(cfg.ButtonColorEnd, "#26B773")
+            self.colorCard.startColorItem.setColor("#006E38")
+            self.colorCard.endColorItem.setColor("#26B773")
+            self.colorCard.defaultRadioButton.setChecked(True)
+            self.colorCard.customRadioButton.setChecked(False)
+            self.colorCard._setCustomEnabled(False)
+            self.colorCard.choiceLabel.setText("默认颜色")
+            self.colorCard.choiceLabel.adjustSize()
             self.opacityCard.setValue(75)
             self.autoRunCard.setValue(True)
             self.showTimeCard.setValue(True)
