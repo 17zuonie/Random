@@ -11,19 +11,18 @@ from typing import Union
 from psutil import process_iter, Process
 from RandomConfig import cfg, VERSION
 from pygetwindow import getWindowsWithTitle as GetWindow
-from PyQt5.QtCore import Qt, pyqtSignal, QRectF, QEasingCurve, QEvent, QTimer, QModelIndex, QObject, QRunnable, \
-    QThreadPool, QUrl
-from PyQt5.QtGui import QColor, QIcon, QPainter, QTextCursor, QPainterPath, QKeySequence, QDesktopServices
-from PyQt5.QtWidgets import QFrame, QApplication, QWidget, QHBoxLayout, QLabel, QVBoxLayout, QPushButton, \
-    QTextEdit, QLineEdit, QSpinBox, QScrollArea, QScroller, QAction, QFileDialog, QCompleter, QSizePolicy, QButtonGroup, \
-    QGridLayout
+from PyQt5.QtCore import Qt, pyqtSignal, QRectF, QEasingCurve, QEvent, QTimer, QModelIndex, QObject, QRunnable, QUrl, \
+    QThreadPool
+from PyQt5.QtGui import QColor, QIcon, QPainter, QPainterPath, QKeySequence, QDesktopServices
+from PyQt5.QtWidgets import QFrame, QApplication, QWidget, QHBoxLayout, QLabel, QVBoxLayout, QPushButton, QGridLayout, \
+    QLineEdit, QSpinBox, QScrollArea, QScroller, QAction, QFileDialog, QCompleter, QSizePolicy
 from qfluentwidgets import NavigationItemPosition, SubtitleLabel, MessageBox, ExpandLayout, MaskDialogBase, \
-    SettingCardGroup, ComboBox, SwitchButton, IndicatorPosition, qconfig, TextWrap, InfoBarIcon, PrimaryPushButton, \
-    isDarkTheme, ConfigItem, OptionsConfigItem, FluentStyleSheet, HyperlinkButton, IconWidget, drawIcon, \
-    setThemeColor, SmoothScrollDelegate, setFont, themeColor, setTheme, Theme, qrouter, NavigationBar, CheckBox, \
-    NavigationBarPushButton, SplashScreen, Slider, OptionsSettingCard, InfoBar, TransparentToolButton, BodyLabel, \
-    InfoBarPosition, ExpandSettingCard, ToolTipFilter, ToolTipPosition, FluentFontIconBase, ExpandGroupSettingCard, \
-    ColorConfigItem, RadioButton, FlyoutViewBase, Flyout, FlyoutAnimationType, ClickableSlider, CardWidget
+    SettingCardGroup, SwitchButton, IndicatorPosition, qconfig, TextWrap, InfoBarIcon, PrimaryPushButton, isDarkTheme, \
+    ConfigItem, FluentStyleSheet, HyperlinkButton, IconWidget, drawIcon, setThemeColor, SmoothScrollDelegate, setFont, \
+    themeColor, setTheme, Theme, qrouter, NavigationBar, CheckBox, NavigationBarPushButton, SplashScreen, Slider, \
+    InfoBar, TransparentToolButton, BodyLabel, InfoBarPosition, ExpandSettingCard, ToolTipFilter, ToolTipPosition, \
+    FluentFontIconBase, ExpandGroupSettingCard, RadioButton, FlyoutViewBase, Flyout, FlyoutAnimationType, CardWidget, \
+    ClickableSlider
 from qfluentwidgets.components.widgets.line_edit import LineEditButton, CompleterMenu
 from qfluentwidgets.components.widgets.menu import MenuAnimationType, RoundMenu
 from qfluentwidgets.components.widgets.spin_box import SpinButton, SpinIcon
@@ -468,31 +467,6 @@ class SpinBox(InlineSpinBoxBase, QSpinBox):
     """ Spin box """
 
 
-class TextEditMenu(EditMenu):
-    def __init__(self, parent: QTextEdit):
-        super().__init__("", parent)
-        cursor = parent.textCursor()
-        self.selectionStart = cursor.selectionStart()
-        self.selectionLength = cursor.selectionEnd() - self.selectionStart + 1
-
-    def _parentText(self):
-        return self.parent().toPlainText()
-
-    def _parentSelectedText(self):
-        return self.parent().textCursor().selectedText()
-
-    def _onItemClicked(self, item):
-        if self.selectionStart >= 0:
-            cursor = self.parent().textCursor()
-            cursor.setPosition(self.selectionStart)
-            cursor.movePosition(QTextCursor.Right, QTextCursor.KeepAnchor, self.selectionLength)
-
-        super()._onItemClicked(item)
-
-    def exec(self, pos, ani=True, aniType=MenuAnimationType.DROP_DOWN):
-        return super().exec(pos, ani, aniType)
-
-
 class SettingIconWidget(IconWidget):
 
     def paintEvent(self, e):
@@ -900,36 +874,6 @@ class ShowFolderItem(QWidget):
             self.folderLabel.setStyleSheet("font: 11px 'Segoe UI', 'Microsoft YaHei', 'PingFang SC'; padding: 0; border: none; background-color: transparent; color: rgb(96, 96, 96);")
 
 
-class CustomPathSettingCard(ExpandSettingCard):
-
-    def __init__(self, title: str, content: str = None, parent=None):
-        super().__init__(FluentFontIcon("\ue722"), title, content, parent)
-        self.__initWidget()
-
-    def __initWidget(self):
-        self.viewLayout.setSpacing(0)
-        self.viewLayout.setAlignment(Qt.AlignTop)
-        self.viewLayout.setContentsMargins(0, 0, 0, 0)
-
-        self.showFolderItem = ShowFolderItem(cfg.ScreenShotPath.value, self.view)
-        self.showFolderItem.changeButton.clicked.connect(self.showFolderDialog)
-        self.viewLayout.addWidget(self.showFolderItem)
-
-        self.updateContent()
-        self._adjustViewSize()
-
-    def showFolderDialog(self):
-        folder = QFileDialog.getExistingDirectory(self, "选择文件夹", os.path.join(os.path.expanduser('~'), '.Random'))
-        if not folder:
-            return
-
-        cfg.set(cfg.ScreenShotPath, folder)
-        self.showFolderItem.setFolder(cfg.ScreenShotPath.value)
-
-    def updateContent(self):
-        self.showFolderItem.setFolder(cfg.ScreenShotPath.value)
-
-
 class CustomScreenMarginSettingCard(ExpandSettingCard):
 
     def __init__(self, title: str, content: str = None, parent=None):
@@ -980,101 +924,6 @@ class CustomScreenMarginSettingCard(ExpandSettingCard):
         self.bottomMargin.spinBox.setValue(cfg.BottomMargin.value)
         self.leftMargin.spinBox.setValue(cfg.LeftMargin.value)
         self.rightMargin.spinBox.setValue(cfg.RightMargin.value)
-
-
-class CustomColorSettingCard(ExpandGroupSettingCard):
-
-    colorChanged = pyqtSignal(QColor)
-
-    def __init__(self, configItem: ColorConfigItem, icon: Union[str, QIcon], title: str,
-                 content=None, parent=None, enableAlpha=False):
-        super().__init__(icon, title, content, parent=parent)
-        self.enableAlpha = enableAlpha
-        self.configItem = configItem
-        self.defaultColor = QColor(configItem.defaultValue)
-        self.customColor = QColor(qconfig.get(configItem))
-
-        self.choiceLabel = QLabel(self)
-
-        self.radioWidget = QWidget(self.view)
-        self.radioLayout = QVBoxLayout(self.radioWidget)
-        self.defaultRadioButton = RadioButton("默认颜色", self.radioWidget)
-        self.customRadioButton = RadioButton("自定义颜色", self.radioWidget)
-        self.buttonGroup = QButtonGroup(self)
-
-        self.customColorWidget = QWidget(self.view)
-        self.customColorLayout = QHBoxLayout(self.customColorWidget)
-        self.customLabel = QLabel("自定义颜色", self.customColorWidget)
-        self.chooseColorButton = DropDownColorPicker(qconfig.get(configItem), self.customColorWidget)
-
-        self.__initWidget()
-
-    def __initWidget(self):
-        self.__initLayout()
-
-        if self.defaultColor != self.customColor:
-            self.customRadioButton.setChecked(True)
-            self.chooseColorButton.setEnabled(True)
-        else:
-            self.defaultRadioButton.setChecked(True)
-            self.chooseColorButton.setEnabled(False)
-
-        self.choiceLabel.setText(self.buttonGroup.checkedButton().text())
-        self.choiceLabel.adjustSize()
-
-        self.choiceLabel.setObjectName("titleLabel")
-        self.customLabel.setObjectName("titleLabel")
-        self.chooseColorButton.setObjectName('chooseColorButton')
-
-        self.buttonGroup.buttonClicked.connect(self.__onRadioButtonClicked)
-        self.chooseColorButton.colorChanged.connect(self.__onCustomColorChanged)
-
-    def __initLayout(self):
-        self.addWidget(self.choiceLabel)
-
-        self.radioLayout.setSpacing(19)
-        self.radioLayout.setAlignment(Qt.AlignTop)
-        self.radioLayout.setContentsMargins(48, 18, 0, 18)
-        self.buttonGroup.addButton(self.customRadioButton)
-        self.buttonGroup.addButton(self.defaultRadioButton)
-        self.radioLayout.addWidget(self.customRadioButton)
-        self.radioLayout.addWidget(self.defaultRadioButton)
-        self.radioLayout.setSizeConstraint(QVBoxLayout.SetMinimumSize)
-
-        self.customColorLayout.setContentsMargins(48, 18, 44, 18)
-        self.customColorLayout.addWidget(self.customLabel, 0, Qt.AlignLeft)
-        self.customColorLayout.addWidget(self.chooseColorButton, 0, Qt.AlignRight)
-        self.customColorLayout.setSizeConstraint(QHBoxLayout.SetMinimumSize)
-
-        self.viewLayout.setSpacing(0)
-        self.viewLayout.setContentsMargins(0, 0, 0, 0)
-        self.addGroupWidget(self.radioWidget)
-        self.addGroupWidget(self.customColorWidget)
-
-    def __onRadioButtonClicked(self, button: RadioButton):
-        if button.text() == self.choiceLabel.text():
-            return
-
-        self.choiceLabel.setText(button.text())
-        self.choiceLabel.adjustSize()
-
-        if button is self.defaultRadioButton:
-            self.chooseColorButton.setDisabled(True)
-            self.chooseColorButton.setColor(self.defaultColor)
-            qconfig.set(self.configItem, self.defaultColor)
-            if self.defaultColor != self.customColor:
-                self.colorChanged.emit(self.defaultColor)
-        else:
-            self.chooseColorButton.setDisabled(False)
-            self.chooseColorButton.setColor(self.customColor)
-            qconfig.set(self.configItem, self.customColor)
-            if self.defaultColor != self.customColor:
-                self.colorChanged.emit(self.customColor)
-
-    def __onCustomColorChanged(self, color):
-        qconfig.set(self.configItem, color)
-        self.customColor = QColor(color)
-        self.colorChanged.emit(color)
 
 
 class ColorSettingItem(QWidget):
@@ -1129,6 +978,115 @@ class ThemePreviewCard(CardWidget):
 
     def isSelected(self) -> bool:
         return self.radioButton.isChecked()
+
+
+class PositionPreviewCard(CardWidget):
+
+    def __init__(self, position, parent=None):
+        super().__init__(parent)
+        self.position = position
+        self.name = position["name"]
+
+        self.radioButton = RadioButton(self.name, self)
+
+        self.hBoxLayout = QHBoxLayout(self)
+        self.hBoxLayout.setContentsMargins(20, 6, 20, 6)
+        self.hBoxLayout.addWidget(self.radioButton)
+
+        self.setFixedSize(180, 40)
+        self.setBorderRadius(8)
+
+        self.radioButton.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+
+    def setSelected(self, selected: bool):
+        self.radioButton.setChecked(selected)
+
+    def isSelected(self) -> bool:
+        return self.radioButton.isChecked()
+
+
+class CustomPositionSettingCard(ExpandGroupSettingCard):
+
+    positionChanged = pyqtSignal(str)
+
+    POSITIONS = [
+        {"name": "左上", "value": "TopLeft"},
+        {"name": "上中", "value": "TopCenter"},
+        {"name": "右上", "value": "TopRight"},
+        {"name": "左下", "value": "BottomLeft"},
+        {"name": "下中", "value": "BottomCenter"},
+        {"name": "右下", "value": "BottomRight"},
+    ]
+
+    COLUMNS = 3
+
+    def __init__(self, configItem: ConfigItem,
+                 icon: Union[str, QIcon],
+                 title: str, content=None, parent=None):
+        super().__init__(icon, title, content, parent=parent)
+        self.configItem = configItem
+
+        self.choiceLabel = QLabel(self)
+        self.positionCards = []
+
+        self.positionsWidget = QWidget(self.view)
+        self.positionsLayout = QGridLayout(self.positionsWidget)
+
+        self.__initWidget()
+
+    def __initWidget(self):
+        self.__initLayout()
+        currentValue = qconfig.get(self.configItem)
+        for card in self.positionCards:
+            if card.position["value"] == currentValue:
+                card.setSelected(True)
+                self.choiceLabel.setText(card.name)
+                self.choiceLabel.adjustSize()
+                break
+
+        self.choiceLabel.setObjectName("titleLabel")
+
+    def __initLayout(self):
+        self.addWidget(self.choiceLabel)
+
+        self.positionsLayout.setSpacing(8)
+        self.positionsLayout.setContentsMargins(48, 14, 44, 14)
+        for i, position in enumerate(self.POSITIONS):
+            card = PositionPreviewCard(position, self.positionsWidget)
+            card.clicked.connect(lambda pos=position: self.__onPositionClicked(pos))
+            self.positionCards.append(card)
+            self.positionsLayout.addWidget(card, i // self.COLUMNS, i % self.COLUMNS)
+
+        self.viewLayout.setSpacing(0)
+        self.viewLayout.setContentsMargins(0, 0, 0, 0)
+        self.addGroupWidget(self.positionsWidget)
+
+    def _clearAllSelection(self):
+        for card in self.positionCards:
+            card.setSelected(False)
+
+    def setValue(self, value):
+        qconfig.set(self.configItem, value)
+        for card in self.positionCards:
+            if card.position["value"] == value:
+                self._clearAllSelection()
+                card.setSelected(True)
+                self.choiceLabel.setText(card.name)
+                self.choiceLabel.adjustSize()
+                break
+
+    def __onPositionClicked(self, position):
+        if self.choiceLabel.text() == position["name"]:
+            return
+        self._clearAllSelection()
+        for card in self.positionCards:
+            if card.position is position or card.name == position["name"]:
+                card.setSelected(True)
+                break
+        self.choiceLabel.setText(position["name"])
+        self.choiceLabel.adjustSize()
+        qconfig.set(self.configItem, position["value"])
+        self.positionChanged.emit(position["value"])
 
 
 class CustomGradientColorSettingCard(ExpandGroupSettingCard):
@@ -1477,33 +1435,6 @@ class RangeSettingCard(SettingCard):
         self.slider.setValue(value)
 
 
-class ComboBoxSettingCard(SettingCard):
-    def __init__(self, configItem: OptionsConfigItem, icon: Union[str, QIcon], title, content=None, texts=None, parent=None):
-        super().__init__(icon, title, content, parent)
-        self.configItem = configItem
-        self.comboBox = ComboBox(self)
-        self.hBoxLayout.addWidget(self.comboBox, 0, Qt.AlignRight)
-        self.hBoxLayout.addSpacing(16)
-
-        self.optionToText = {o: t for o, t in zip(configItem.options, texts)}
-        for text, option in zip(texts, configItem.options):
-            self.comboBox.addItem(text, userData=option)
-
-        self.comboBox.setCurrentText(self.optionToText[qconfig.get(configItem)])
-        self.comboBox.currentIndexChanged.connect(self._onCurrentIndexChanged)
-        configItem.valueChanged.connect(self.setValue)
-
-    def _onCurrentIndexChanged(self, index: int):
-        qconfig.set(self.configItem, self.comboBox.itemData(index))
-
-    def setValue(self, value):
-        if value not in self.optionToText:
-            return
-
-        self.comboBox.setCurrentText(self.optionToText[value])
-        qconfig.set(self.configItem, value)
-
-
 class RestartSignals(QObject):
     restartFinished = pyqtSignal(bool)
 
@@ -1602,12 +1533,11 @@ class SettingInterface(SmoothScrollArea):
             "",
             configItem=cfg.ShowTime,
             parent=self.actGroup)
-        self.positionCard = OptionsSettingCard(
+        self.positionCard = CustomPositionSettingCard(
             cfg.Position,
             FluentFontIcon("\ue7c2"),
             "位置",
             "按钮启动时的出现位置",
-            texts=["左上", "上中", "右上", "左下", "下中", "右下"],
             parent=self.actGroup)
         self.marginCard = CustomScreenMarginSettingCard(
             title="屏幕边距",
@@ -1777,7 +1707,7 @@ class SettingInterface(SmoothScrollArea):
             qconfig.set(cfg.RightMargin, 18)
             self.marginCard.updateValue()
 
-            self.positionCard.adjustSize()
+
 
     def restartThreadFinished(self):
         InfoBar.success(
