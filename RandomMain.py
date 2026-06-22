@@ -353,8 +353,9 @@ class Main(QWidget):
             f'border-radius: 16px;'
             f'border: 0.5px groove gray;'
             f'border-style: outset;'
-            f'font-family: "Microsoft YaHei";'
+            f'font-family: "JetBrains Mono";'
             f'font-size: 15pt;'
+            f'font-weight: bold;'
             f'}}'
             f'QPushButton:hover {{'
             f'background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, '
@@ -442,8 +443,8 @@ class Main(QWidget):
         self._tray_icon_menu.addAction(self._capture_screen_action)
         self._tray_icon_menu.addAction(self._open_screenshot_path)
         self._tray_icon_menu.addSeparator()
-        self._tray_icon_menu.addAction(self._reset_action)
         self._tray_icon_menu.addMenu(self.subMenu)
+        self._tray_icon_menu.addAction(self._reset_action)
         self._tray_icon_menu.addSeparator()
         self._tray_icon_menu.addAction(self._setting_action)
         self._tray_icon_menu.addAction(self._help_action)
