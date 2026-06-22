@@ -15,14 +15,15 @@ from PyQt5.QtCore import Qt, pyqtSignal, QRectF, QEasingCurve, QEvent, QTimer, Q
     QThreadPool, QUrl
 from PyQt5.QtGui import QColor, QIcon, QPainter, QTextCursor, QPainterPath, QKeySequence, QDesktopServices
 from PyQt5.QtWidgets import QFrame, QApplication, QWidget, QHBoxLayout, QLabel, QVBoxLayout, QPushButton, \
-    QTextEdit, QLineEdit, QSpinBox, QScrollArea, QScroller, QAction, QFileDialog, QCompleter, QSizePolicy, QButtonGroup
+    QTextEdit, QLineEdit, QSpinBox, QScrollArea, QScroller, QAction, QFileDialog, QCompleter, QSizePolicy, QButtonGroup, \
+    QGridLayout
 from qfluentwidgets import NavigationItemPosition, SubtitleLabel, MessageBox, ExpandLayout, MaskDialogBase, \
     SettingCardGroup, ComboBox, SwitchButton, IndicatorPosition, qconfig, TextWrap, InfoBarIcon, PrimaryPushButton, \
     isDarkTheme, ConfigItem, OptionsConfigItem, FluentStyleSheet, HyperlinkButton, IconWidget, drawIcon, \
     setThemeColor, SmoothScrollDelegate, setFont, themeColor, setTheme, Theme, qrouter, NavigationBar, CheckBox, \
     NavigationBarPushButton, SplashScreen, Slider, OptionsSettingCard, InfoBar, TransparentToolButton, BodyLabel, \
     InfoBarPosition, ExpandSettingCard, ToolTipFilter, ToolTipPosition, FluentFontIconBase, ExpandGroupSettingCard, \
-    ColorConfigItem, RadioButton, FlyoutViewBase, Flyout, FlyoutAnimationType, ClickableSlider
+    ColorConfigItem, RadioButton, FlyoutViewBase, Flyout, FlyoutAnimationType, ClickableSlider, CardWidget
 from qfluentwidgets.components.widgets.line_edit import LineEditButton, CompleterMenu
 from qfluentwidgets.components.widgets.menu import MenuAnimationType, RoundMenu
 from qfluentwidgets.components.widgets.spin_box import SpinButton, SpinIcon
@@ -672,7 +673,6 @@ class ColorPickerFlyoutView(FlyoutViewBase):
         self.hexLineEdit.setColor(color)
         if movePicker:
             self.huePanel.setColor(color)
-        # 颜色变化时重新设置 QSS 更新 groove 渐变色
         self.__setQss()
 
     def __onHueChanged(self, color):
@@ -1103,33 +1103,82 @@ class ColorSettingItem(QWidget):
         return self.colorPicker.getColor().name().upper()
 
 
+class ThemePreviewCard(CardWidget):
+
+    themeClicked = pyqtSignal(object)
+
+    def __init__(self, theme, parent=None):
+        super().__init__(parent)
+        self.theme = theme
+        self.name = theme["name"]
+
+        self.radioButton = RadioButton(self.name, self)
+
+        self.hBoxLayout = QHBoxLayout(self)
+        self.hBoxLayout.setContentsMargins(20, 6, 20, 6)
+        self.hBoxLayout.addWidget(self.radioButton)
+
+        self.setFixedSize(180, 40)
+        self.setBorderRadius(8)
+
+        self.radioButton.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        self.clicked.connect(lambda: self.themeClicked.emit(self.theme))
+
+    def setSelected(self, selected: bool):
+        self.radioButton.setChecked(selected)
+
+    def isSelected(self) -> bool:
+        return self.radioButton.isChecked()
+
+
 class CustomGradientColorSettingCard(ExpandGroupSettingCard):
 
-    colorChanged = pyqtSignal(str, str)  # startHex, endHex
+    colorChanged = pyqtSignal(str, str)
+
+    BUILT_IN_THEMES = [
+        {"name": "深邃", "start": "#282E3C", "end": "#000000"},
+        {"name": "晨雾", "start": "#DDDFE2", "end": "#AAB0B6"},
+        {"name": "冰凉薄荷", "start": "#CAE0E4", "end": "#84B6C0"},
+        {"name": "海岛度假", "start": "#73D1D3", "end": "#47A5A8"},
+        {"name": "凉风", "start": "#A7C6DB", "end": "#699DC0"},
+        {"name": "晚霞", "start": "#F0E3E1", "end": "#D5B2AC"},
+        {"name": "泡泡糖", "start": "#F9BCD3", "end": "#F46FA1"},
+        {"name": "芒果天堂", "start": "#F1CBA0", "end": "#E48E30"},
+        {"name": "雨夜", "start": "#56585D", "end": "#38393C"},
+        {"name": "青石板", "start": "#46546A", "end": "#2B3441"},
+        {"name": "月光", "start": "#1C4C7F", "end": "#0F2B48"},
+        {"name": "多汁的梅", "start": "#6C36B1", "end": "#452372"},
+        {"name": "辣红", "start": "#A2131D", "end": "#6A0D12"},
+        {"name": "神秘森林", "start": "#20612D", "end": "#143E1D"},
+    ]
+
+    COLUMNS = 3
 
     def __init__(self, startConfigItem: ConfigItem, endConfigItem: ConfigItem,
+                 isCustomConfigItem: ConfigItem,
                  defaultStart: str, defaultEnd: str, icon: Union[str, QIcon],
                  title: str, content=None, parent=None):
         super().__init__(icon, title, content, parent=parent)
         self.startConfigItem = startConfigItem
         self.endConfigItem = endConfigItem
+        self.isCustomConfigItem = isCustomConfigItem
         self.defaultStart = QColor(defaultStart)
         self.defaultEnd = QColor(defaultEnd)
 
         self.choiceLabel = QLabel(self)
+        self.selectedThemeName = "自定义颜色"
+        self.themeCards = []
+        self.customCard = None
 
-        self.radioWidget = QWidget(self.view)
-        self.radioLayout = QVBoxLayout(self.radioWidget)
-        self.defaultRadioButton = RadioButton("默认颜色", self.radioWidget)
-        self.customRadioButton = RadioButton("自定义颜色", self.radioWidget)
-        self.buttonGroup = QButtonGroup(self)
+        self.themesWidget = QWidget(self.view)
+        self.themesLayout = QGridLayout(self.themesWidget)
 
         self.customColorWidget = QWidget(self.view)
         self.customColorLayout = QVBoxLayout(self.customColorWidget)
         self.customColorLayout.setSpacing(0)
         self.customColorLayout.setContentsMargins(0, 8, 0, 8)
 
-        self.startColorItem = ColorSettingItem( "渐变起点", qconfig.get(startConfigItem), self.customColorWidget)
+        self.startColorItem = ColorSettingItem("渐变起点", qconfig.get(startConfigItem), self.customColorWidget)
         self.endColorItem = ColorSettingItem("渐变终点", qconfig.get(endConfigItem), self.customColorWidget)
 
         self.__initWidget()
@@ -1139,77 +1188,138 @@ class CustomGradientColorSettingCard(ExpandGroupSettingCard):
 
         currentStart = QColor(qconfig.get(self.startConfigItem))
         currentEnd = QColor(qconfig.get(self.endConfigItem))
-        isCustom = (currentStart != self.defaultStart) or (currentEnd != self.defaultEnd)
+        isCustom = qconfig.get(self.isCustomConfigItem)
 
         if isCustom:
-            self.customRadioButton.setChecked(True)
-            self._setCustomEnabled(True)
+            self._applyCustomSelection()
         else:
-            self.defaultRadioButton.setChecked(True)
-            self._setCustomEnabled(False)
-
-        self.choiceLabel.setText(self.buttonGroup.checkedButton().text())
-        self.choiceLabel.adjustSize()
+            matchedTheme = self._findTheme(currentStart, currentEnd)
+            if matchedTheme:
+                self._applyThemeSelection(matchedTheme)
+            else:
+                self._applyCustomSelection()
 
         self.choiceLabel.setObjectName("titleLabel")
 
-        self.buttonGroup.buttonClicked.connect(self.__onRadioButtonClicked)
         self.startColorItem.colorPicker.colorChanged.connect(self.__onCustomColorChanged)
         self.endColorItem.colorPicker.colorChanged.connect(self.__onCustomColorChanged)
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
 
     def __initLayout(self):
         self.addWidget(self.choiceLabel)
 
-        self.radioLayout.setSpacing(19)
-        self.radioLayout.setAlignment(Qt.AlignTop)
-        self.radioLayout.setContentsMargins(48, 18, 0, 18)
-        self.buttonGroup.addButton(self.customRadioButton)
-        self.buttonGroup.addButton(self.defaultRadioButton)
-        self.radioLayout.addWidget(self.customRadioButton)
-        self.radioLayout.addWidget(self.defaultRadioButton)
-        self.radioLayout.setSizeConstraint(QVBoxLayout.SetMinimumSize)
+        self.themesLayout.setSpacing(8)
+        self.themesLayout.setContentsMargins(48, 14, 44, 14)
+        for i, theme in enumerate(self.BUILT_IN_THEMES):
+            card = ThemePreviewCard(theme, self.themesWidget)
+            card.themeClicked.connect(self.__onThemeClicked)
+            self.themeCards.append(card)
+            self.themesLayout.addWidget(card, i // self.COLUMNS, i % self.COLUMNS)
+
+        customTheme = {"name": "自定义颜色", "start": "", "end": ""}
+        self.customCard = ThemePreviewCard(customTheme, self.themesWidget)
+        self.customCard.themeClicked.connect(self.__onCustomCardClicked)
+        self.themeCards.append(self.customCard)
+        ci = len(self.BUILT_IN_THEMES)
+        self.themesLayout.addWidget(self.customCard, ci // self.COLUMNS, ci % self.COLUMNS)
 
         self.customColorLayout.addWidget(self.startColorItem)
         self.customColorLayout.addWidget(self.endColorItem)
 
         self.viewLayout.setSpacing(0)
         self.viewLayout.setContentsMargins(0, 0, 0, 0)
-        self.addGroupWidget(self.radioWidget)
+        self.addGroupWidget(self.themesWidget)
         self.addGroupWidget(self.customColorWidget)
+
+    def _findTheme(self, startColor: QColor, endColor: QColor):
+        for theme in self.BUILT_IN_THEMES:
+            if (QColor(theme["start"]) == startColor) and (QColor(theme["end"]) == endColor):
+                return theme
+        return None
+
+    def _clearAllThemeSelection(self):
+        for card in self.themeCards:
+            card.setSelected(False)
+
+    def _applyThemeSelection(self, theme):
+        self._clearAllThemeSelection()
+        self.selectedThemeName = theme["name"]
+        for card in self.themeCards:
+            if card.theme is theme or card.name == theme["name"]:
+                card.setSelected(True)
+                break
+        self.choiceLabel.setText(theme["name"])
+        self.choiceLabel.adjustSize()
+        self._setCustomEnabled(False)
+
+    def _applyCustomSelection(self):
+        self._clearAllThemeSelection()
+        self.selectedThemeName = "自定义颜色"
+        if self.customCard:
+            self.customCard.setSelected(True)
+        self.choiceLabel.setText("自定义颜色")
+        self.choiceLabel.adjustSize()
+        self._setCustomEnabled(True)
 
     def _setCustomEnabled(self, enabled: bool):
         self.startColorItem.colorPicker.setEnabled(enabled)
         self.endColorItem.colorPicker.setEnabled(enabled)
 
-    def __onRadioButtonClicked(self, button: RadioButton):
-        if button.text() == self.choiceLabel.text():
+    def applyTheme(self, theme):
+        startHex = QColor(theme["start"]).name().upper()
+        endHex = QColor(theme["end"]).name().upper()
+        self._applyThemeSelection(theme)
+        self.startColorItem.setColor(startHex)
+        self.endColorItem.setColor(endHex)
+        qconfig.set(self.startConfigItem, startHex)
+        qconfig.set(self.endConfigItem, endHex)
+        qconfig.set(self.isCustomConfigItem, False)
+        self.colorChanged.emit(startHex, endHex)
+
+    def applyCustomColors(self, startHex: str, endHex: str):
+        self._applyCustomSelection()
+        self.startColorItem.setColor(startHex)
+        self.endColorItem.setColor(endHex)
+        qconfig.set(self.startConfigItem, startHex)
+        qconfig.set(self.endConfigItem, endHex)
+        qconfig.set(self.isCustomConfigItem, True)
+        self.colorChanged.emit(startHex, endHex)
+
+    def __onThemeClicked(self, theme):
+        startHex = QColor(theme["start"]).name().upper()
+        endHex = QColor(theme["end"]).name().upper()
+        if self.selectedThemeName == theme["name"]:
             return
+        self._applyThemeSelection(theme)
+        self.startColorItem.setColor(startHex)
+        self.endColorItem.setColor(endHex)
+        qconfig.set(self.startConfigItem, startHex)
+        qconfig.set(self.endConfigItem, endHex)
+        qconfig.set(self.isCustomConfigItem, False)
+        self.colorChanged.emit(startHex, endHex)
 
-        self.choiceLabel.setText(button.text())
-        self.choiceLabel.adjustSize()
-
-        if button is self.defaultRadioButton:
-            self._setCustomEnabled(False)
-            startHex = self.defaultStart.name().upper()
-            endHex = self.defaultEnd.name().upper()
-            qconfig.set(self.startConfigItem, startHex)
-            qconfig.set(self.endConfigItem, endHex)
-            self.startColorItem.setColor(startHex)
-            self.endColorItem.setColor(endHex)
-            self.colorChanged.emit(startHex, endHex)
-        else:
-            self._setCustomEnabled(True)
-            startHex = self.startColorItem.getHex()
-            endHex = self.endColorItem.getHex()
-            qconfig.set(self.startConfigItem, startHex)
-            qconfig.set(self.endConfigItem, endHex)
-            self.colorChanged.emit(startHex, endHex)
-
-    def __onCustomColorChanged(self, _=None):
+    def __onCustomCardClicked(self, _theme):
+        if self.selectedThemeName == "自定义颜色":
+            return
+        self._applyCustomSelection()
         startHex = self.startColorItem.getHex()
         endHex = self.endColorItem.getHex()
         qconfig.set(self.startConfigItem, startHex)
         qconfig.set(self.endConfigItem, endHex)
+        qconfig.set(self.isCustomConfigItem, True)
+        self.colorChanged.emit(startHex, endHex)
+
+    def __onCustomColorChanged(self, _=None):
+        startHex = self.startColorItem.getHex()
+        endHex = self.endColorItem.getHex()
+
+        self._applyCustomSelection()
+
+        qconfig.set(self.startConfigItem, startHex)
+        qconfig.set(self.endConfigItem, endHex)
+        qconfig.set(self.isCustomConfigItem, True)
         self.colorChanged.emit(startHex, endHex)
 
 
@@ -1467,6 +1577,7 @@ class SettingInterface(SmoothScrollArea):
         self.colorCard = CustomGradientColorSettingCard(
             cfg.ButtonColorStart,
             cfg.ButtonColorEnd,
+            cfg.IsCustomColor,
             "#006E38",
             "#26B773",
             FluentFontIcon("\ue790"),
@@ -1640,15 +1751,16 @@ class SettingInterface(SmoothScrollArea):
         if w.exec():
             self.valueCard.setValue(40)
             self.noRepeatCard.setValue(True)
-            qconfig.set(cfg.ButtonColorStart, "#006E38")
-            qconfig.set(cfg.ButtonColorEnd, "#26B773")
-            self.colorCard.startColorItem.setColor("#006E38")
-            self.colorCard.endColorItem.setColor("#26B773")
-            self.colorCard.defaultRadioButton.setChecked(True)
-            self.colorCard.customRadioButton.setChecked(False)
-            self.colorCard._setCustomEnabled(False)
-            self.colorCard.choiceLabel.setText("默认颜色")
-            self.colorCard.choiceLabel.adjustSize()
+            defaultStart = "#282E3C"
+            defaultEnd = "#000000"
+            qconfig.set(cfg.ButtonColorStart, defaultStart)
+            qconfig.set(cfg.ButtonColorEnd, defaultEnd)
+            qconfig.set(cfg.IsCustomColor, False)
+            deepTheme = next((t for t in self.colorCard.BUILT_IN_THEMES if t["name"] == "深邃"), None)
+            if deepTheme:
+                self.colorCard.applyTheme(deepTheme)
+            else:
+                self.colorCard.applyCustomColors(defaultStart, defaultEnd)
             self.opacityCard.setValue(75)
             self.autoRunCard.setValue(True)
             self.showTimeCard.setValue(True)
