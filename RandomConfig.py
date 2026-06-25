@@ -32,6 +32,6 @@ class Config(QConfig):
     EnableScreenShotHotKey = ConfigItem("MainWindow", "EnableScreenShotHotKey", True, BoolValidator())
 
 
-VERSION = "v5.5.3"
+VERSION = "v5.5.4"
 cfg = Config()
 qconfig.load(os.path.join(os.path.expanduser('~'), '.Random', 'config', 'config.json'), cfg)

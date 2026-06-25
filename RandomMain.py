@@ -15,7 +15,7 @@ from darkdetect import isDark
 from ctypes.wintypes import MSG
 from ctypes import windll, byref
 from win32con import MOD_CONTROL, MOD_SHIFT, MOD_ALT
-from PyQt5.QtGui import QIcon, QMouseEvent, QCursor, QDesktopServices, QColor
+from PyQt5.QtGui import QIcon, QMouseEvent, QCursor, QDesktopServices, QColor, QPixmap
 from PyQt5.QtCore import Qt, QTimer, QDateTime, pyqtSignal, QThread, QPropertyAnimation, QUrl
 from PyQt5.QtWidgets import QAction, QPushButton, QVBoxLayout, QSystemTrayIcon, QWidget, QApplication, QHBoxLayout, \
     QLabel, QFrame
@@ -418,16 +418,19 @@ class Main(QWidget):
         hideShortCut = self.hideHotKey if cfg.EnableHideHotKey.value else ""
         showShortCut = self.showHotKey if cfg.EnableShowHotKey.value else ""
         screenShotShortCut = self.screenShotHotKey if cfg.EnableScreenShotHotKey.value else ""
-        self._run_action = QAction(FluentFontIcon("\ue724").icon(), "生成随机数", shortcut=runShortCut, parent=self)
-        self._hide_action = QAction(FluentFontIcon("\uecc9").icon(), "隐藏", shortcut=hideShortCut, parent=self)
-        self._restore_action = QAction(FluentFontIcon("\uecc8").icon(), "显示", shortcut=showShortCut, parent=self)
+        emptyIconPixmap = QPixmap(16, 16)
+        emptyIconPixmap.fill(Qt.transparent)
+        self._run_action = QAction(QIcon(emptyIconPixmap), "生成随机数", self)
+        self._run_action.setShortcut(runShortCut)
+        self._hide_action = QAction(QIcon(emptyIconPixmap), "隐藏", shortcut=hideShortCut, parent=self)
+        self._restore_action = QAction(QIcon(emptyIconPixmap), "显示", shortcut=showShortCut, parent=self)
         self._run_action.triggered.connect(self.run)
         self._hide_action.triggered.connect(self.hide)
         self._restore_action.triggered.connect(self.restoreFromTray)
 
         self._capture_screen_action = QAction(FluentFontIcon("\ue722").icon(), "屏幕快照", shortcut=screenShotShortCut, parent=self)
         self._capture_screen_action.triggered.connect(self.captureScreen)
-        self._open_screenshot_path = QAction(FluentFontIcon("\ue838").icon(), "打开文件夹", parent=self)
+        self._open_screenshot_path = QAction(QIcon(emptyIconPixmap), "打开文件夹", parent=self)
         self._open_screenshot_path.triggered.connect(self.openScreenshotPath)
 
         self._quit_action = QAction(FluentFontIcon("\ue7e8").icon(), "退出", self)
