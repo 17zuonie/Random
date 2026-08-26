@@ -15,7 +15,7 @@ from darkdetect import isDark
 from ctypes.wintypes import MSG
 from ctypes import windll, byref
 from win32con import MOD_CONTROL, MOD_SHIFT, MOD_ALT
-from PyQt5.QtGui import QIcon, QMouseEvent, QCursor, QDesktopServices, QColor, QPixmap
+from PyQt5.QtGui import QIcon, QMouseEvent, QCursor, QDesktopServices, QColor, QPixmap, QFontDatabase
 from PyQt5.QtCore import Qt, QTimer, QDateTime, pyqtSignal, QThread, QPropertyAnimation, QUrl
 from PyQt5.QtWidgets import QAction, QPushButton, QVBoxLayout, QSystemTrayIcon, QWidget, QApplication, QHBoxLayout, \
     QLabel, QFrame
@@ -353,7 +353,7 @@ class Main(QWidget):
             f'border-radius: 16px;'
             f'border: 0.5px groove gray;'
             f'border-style: outset;'
-            f'font-family: "JetBrains Mono";'
+            f'font-family: "{cfg.FontFamily.value}", "Consolas", "Microsoft YaHei";'
             f'font-size: 15pt;'
             f'font-weight: bold;'
             f'}}'
@@ -555,7 +555,7 @@ class Main(QWidget):
                 self.hide()
                 QApplication.processEvents()
 
-        with mss.mss() as sct:
+        with mss.MSS() as sct:
             monitor = sct.monitors[0]
             screenshot = sct.grab(monitor)
 
@@ -625,6 +625,7 @@ if __name__ == "__main__":
             else:
                 setTheme(Theme.LIGHT)
             app = QApplication(sys.argv)
+            QFontDatabase.addApplicationFont("Font/JetBrainsMono-Regular.ttf")
             widget = Main()
             widget.show()
             sys.exit(app.exec())

@@ -8,8 +8,8 @@ from qfluentwidgets import qconfig, QConfig, ConfigItem, OptionsConfigItem, Bool
 class Config(QConfig):
     Value = RangeConfigItem("MainWindow", "Value", 40, RangeValidator(2, 999))
     NoRepeat = ConfigItem("MainWindow", "NoRepeat", True, BoolValidator())
-    ButtonColorStart = ConfigItem("MainWindow", "ButtonColorStart", "#282E3C", ConfigValidator())
-    ButtonColorEnd = ConfigItem("MainWindow", "ButtonColorEnd", "#000000", ConfigValidator())
+    ButtonColorStart = ConfigItem("MainWindow", "ButtonColorStart", "#20612D", ConfigValidator())
+    ButtonColorEnd = ConfigItem("MainWindow", "ButtonColorEnd", "#143E1D", ConfigValidator())
     IsCustomColor = ConfigItem("MainWindow", "IsCustomColor", False, BoolValidator())
     Opacity = RangeConfigItem("MainWindow", "Opacity", 75, RangeValidator(1, 100))
     AutoRun = ConfigItem("MainWindow", "AutoRun", True, BoolValidator())
@@ -21,7 +21,7 @@ class Config(QConfig):
     LeftMargin = RangeConfigItem("MainWindow", "LeftMargin", 18, RangeValidator(0, 1080))
     RightMargin = RangeConfigItem("MainWindow", "RightMargin", 18, RangeValidator(0, 1080))
     IsAutoHide = ConfigItem("MainWindow", "IsAutoHide", True, BoolValidator())
-    ScreenShotPath = ConfigItem("MainWindow", "ScreenShotPath", os.path.join(os.path.expanduser('~'), '.Random', 'ScreenShot'), ConfigValidator())
+    ScreenShotPath = ConfigItem("MainWindow", "ScreenShotPath", os.path.join(os.path.expanduser('~'), 'Pictures', 'Screenshot'), ConfigValidator())
     RunHotKey = ConfigItem("MainWindow", "RunHotKey", "Ctrl+F1", ConfigValidator())
     ShowHotKey = ConfigItem("MainWindow", "ShowHotKey", "Ctrl+F2", ConfigValidator())
     HideHotKey = ConfigItem("MainWindow", "HideHotKey", "Ctrl+F3", ConfigValidator())
@@ -30,8 +30,9 @@ class Config(QConfig):
     EnableShowHotKey = ConfigItem("MainWindow", "EnableShowHotKey", True, BoolValidator())
     EnableHideHotKey = ConfigItem("MainWindow", "EnableHideHotKey", True, BoolValidator())
     EnableScreenShotHotKey = ConfigItem("MainWindow", "EnableScreenShotHotKey", True, BoolValidator())
+    FontFamily = ConfigItem("MainWindow", "FontFamily", "JetBrains Mono", ConfigValidator())
 
 
-VERSION = "v5.5.4"
+VERSION = "v5.6.0"
 cfg = Config()
 qconfig.load(os.path.join(os.path.expanduser('~'), '.Random', 'config', 'config.json'), cfg)

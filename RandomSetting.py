@@ -12,8 +12,9 @@ from psutil import process_iter, Process
 from RandomConfig import cfg, VERSION
 from pygetwindow import getWindowsWithTitle as GetWindow
 from PyQt5.QtCore import Qt, pyqtSignal, QRectF, QEasingCurve, QEvent, QTimer, QModelIndex, QObject, QRunnable, QUrl, \
-    QThreadPool
-from PyQt5.QtGui import QColor, QIcon, QPainter, QPainterPath, QKeySequence, QDesktopServices
+    QThreadPool, QPoint
+from PyQt5.QtGui import QColor, QIcon, QPainter, QPainterPath, QKeySequence, QDesktopServices, QFont, QFontMetrics, \
+    QFontDatabase
 from PyQt5.QtWidgets import QFrame, QApplication, QWidget, QHBoxLayout, QLabel, QVBoxLayout, QPushButton, QGridLayout, \
     QLineEdit, QSpinBox, QScrollArea, QScroller, QAction, QFileDialog, QCompleter, QSizePolicy
 from qfluentwidgets import NavigationItemPosition, SubtitleLabel, MessageBox, ExpandLayout, MaskDialogBase, \
@@ -22,12 +23,13 @@ from qfluentwidgets import NavigationItemPosition, SubtitleLabel, MessageBox, Ex
     themeColor, setTheme, Theme, qrouter, NavigationBar, CheckBox, NavigationBarPushButton, SplashScreen, Slider, \
     InfoBar, TransparentToolButton, BodyLabel, InfoBarPosition, ExpandSettingCard, ToolTipFilter, ToolTipPosition, \
     FluentFontIconBase, ExpandGroupSettingCard, RadioButton, FlyoutViewBase, Flyout, FlyoutAnimationType, CardWidget, \
-    ClickableSlider
+    ClickableSlider, MessageBoxBase
 from qfluentwidgets.components.widgets.line_edit import LineEditButton, CompleterMenu
 from qfluentwidgets.components.widgets.menu import MenuAnimationType, RoundMenu
 from qfluentwidgets.components.widgets.spin_box import SpinButton, SpinIcon
 from qfluentwidgets.window.fluent_window import FluentWindowBase
 from qframelesswindow.titlebar import MinimizeButton, CloseButton, MaximizeButton
+from qfluentwidgets.components.widgets.combo_box import ComboBoxMenu, ComboBox
 from qframelesswindow import TitleBarButton
 from qframelesswindow.utils import startSystemMove
 from qfluentwidgets.components.dialog_box.color_dialog import HuePanel, HexColorLineEdit
@@ -352,6 +354,128 @@ class LineEdit(QLineEdit):
         path = path.subtracted(rectPath)
 
         painter.fillPath(path, self.focusedBorderColor())
+
+
+class FontMenu(ComboBoxMenu):
+
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+        self.setItemHeight(36)
+        self._fontSize = 14
+
+    def setFontSize(self, size: int):
+        self._fontSize = size
+
+    def addFontItem(self, fontName: str, onClick, labelWidth: int = 0,
+                    cachedFont: QFont = None, cachedTextWidth: int = 0):
+        if cachedFont:
+            font = cachedFont
+        else:
+            font = QFont(fontName)
+            font.setPixelSize(self._fontSize)
+
+        textWidth = cachedTextWidth
+        if labelWidth > 0 and textWidth > labelWidth:
+            fm = QFontMetrics(font)
+            displayName = fm.elidedText(fontName, Qt.ElideRight, labelWidth)
+        else:
+            displayName = fontName
+
+        label = QLabel(displayName)
+        qss = f"font: {font.pixelSize()}px '{font.family()}'"
+        label.setStyleSheet(qss)
+        label.setFixedHeight(36)
+        if labelWidth > 0:
+            label.setFixedWidth(labelWidth)
+
+        self.addWidget(label, onClick=onClick)
+
+
+class FontComboBox(ComboBox):
+
+    currentFontChanged = ComboBox.currentTextChanged
+
+    def __init__(self, parent=None, showPreview=True, fontSize=14):
+        super().__init__(parent)
+        self._showPreview = showPreview
+        self._fontSize = fontSize
+        self._fontCache = []  # [(fontName, QFont, textWidth), ...]
+        QFontDatabase.addApplicationFont(
+            os.path.join(os.path.dirname(__file__), "Font", "JetBrainsMono-Regular.ttf"))
+        self._loadFonts()
+
+    def _loadFonts(self):
+        db = QFontDatabase()
+        self.addItems(db.families())
+        if self._showPreview:
+            self._buildFontCache()
+
+    def _buildFontCache(self):
+        self._fontCache = []
+        for i in range(self.count()):
+            fontName = self.itemText(i)
+            font = QFont(fontName)
+            font.setPixelSize(self._fontSize)
+            fm = QFontMetrics(font)
+            textWidth = fm.horizontalAdvance(fontName)
+            self._fontCache.append((fontName, font, textWidth))
+
+    def _createComboMenu(self):
+        if self._showPreview:
+            menu = FontMenu(self)
+            menu.setFontSize(self._fontSize)
+            return menu
+        return ComboBoxMenu(self)
+
+    def _showComboMenu(self):
+        if not self.items:
+            return
+
+        menu = self._createComboMenu()
+
+        if self._showPreview:
+            labelWidth = self.width() - 4
+            for i, data in enumerate(self._fontCache):
+                fontName, cachedFont, textWidth = data
+                menu.addFontItem(fontName,
+                                 onClick=lambda c, x=i: self._onItemClicked(x),
+                                 labelWidth=labelWidth,
+                                 cachedFont=cachedFont,
+                                 cachedTextWidth=textWidth)
+        else:
+            for i, item in enumerate(self.items):
+                from PyQt5.QtWidgets import QAction
+                action = QAction(item.icon, item.text)
+                action.setEnabled(item.isEnabled)
+                menu.addAction(action)
+
+        menu.setMaxVisibleItems(self.maxVisibleItems())
+        menu.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        menu.closedSignal.connect(self._onDropMenuClosed)
+        self.dropMenu = menu
+
+        if self.currentIndex() >= 0 and self.items:
+            menu.setDefaultAction(menu.actions()[self.currentIndex()])
+
+        menu.view.setFixedWidth(self.width())
+        menu.adjustSize()
+
+        x = -menu.width() // 2 + menu.layout().contentsMargins().left() + self.width() // 2
+        pd = self.mapToGlobal(QPoint(x, self.height()))
+        hd = menu.view.heightForAnimation(pd, MenuAnimationType.DROP_DOWN)
+
+        pu = self.mapToGlobal(QPoint(x, 0))
+        hu = menu.view.heightForAnimation(pu, MenuAnimationType.PULL_UP)
+
+        if hd >= hu:
+            menu.view.adjustSize(pd, MenuAnimationType.DROP_DOWN)
+            menu.exec(pd, aniType=MenuAnimationType.DROP_DOWN)
+        else:
+            menu.view.adjustSize(pu, MenuAnimationType.PULL_UP)
+            menu.exec(pu, aniType=MenuAnimationType.PULL_UP)
+
+    def setFontSize(self, size: int):
+        self._fontSize = size
 
 
 class SpinBoxBase:
@@ -1369,6 +1493,31 @@ class HotkeySettingCard(SettingCard):
             self.contentLabel.setText(text)
 
 
+class SimpleSpinBoxSettingCard(SettingCard):
+
+    def __init__(self, icon: Union[str, QIcon], title, content=None, parent=None,
+                 value=40, minimum=2, maximum=999):
+        super().__init__(icon, title, content, parent)
+        self.spinBox = SpinBox(self)
+        self.spinBox.setFixedWidth(130)
+        self.spinBox.setAccelerated(True)
+        self.spinBox.setMaximum(maximum)
+        self.spinBox.setMinimum(minimum)
+        self.spinBox.setValue(value)
+
+        self.hBoxLayout.addStretch(1)
+        self.hBoxLayout.addWidget(self.spinBox, 0, Qt.AlignRight)
+        self.hBoxLayout.addSpacing(16)
+
+    @property
+    def value(self):
+        return self.spinBox.value()
+
+    @value.setter
+    def value(self, v):
+        self.spinBox.setValue(v)
+
+
 class SpinBoxSettingCard(SettingCard):
     valueChanged = pyqtSignal(int)
 
@@ -1435,6 +1584,36 @@ class RangeSettingCard(SettingCard):
         self.slider.setValue(value)
 
 
+class FontSettingCard(SettingCard):
+
+    fontChanged = pyqtSignal(str)
+
+    def __init__(self, icon: Union[str, QIcon], title, content=None,
+                 configItem: ConfigItem = None, parent=None):
+        super().__init__(icon, title, content, parent)
+        self.configItem = configItem
+        self.fontCombo = FontComboBox(self, showPreview=True, fontSize=14)
+        self.fontCombo.setFixedWidth(180)
+
+        if configItem:
+            self.setValue(qconfig.get(configItem))
+            configItem.valueChanged.connect(self.setValue)
+
+        self.hBoxLayout.addWidget(self.fontCombo, 0, Qt.AlignRight)
+        self.hBoxLayout.addSpacing(16)
+
+        self.fontCombo.currentTextChanged.connect(self.__onFontChanged)
+
+    def __onFontChanged(self, text):
+        self.setValue(text)
+        self.fontChanged.emit(text)
+
+    def setValue(self, fontFamily: str):
+        if self.configItem:
+            qconfig.set(self.configItem, fontFamily)
+        self.fontCombo.setCurrentText(fontFamily)
+
+
 class RestartSignals(QObject):
     restartFinished = pyqtSignal(bool)
 
@@ -1485,6 +1664,10 @@ class SettingInterface(SmoothScrollArea):
         self.elementGroup = SettingCardGroup('工作区', self.scrollWidget)
         self.appearanceGroup = SettingCardGroup('外观', self.scrollWidget)
         self.actGroup = SettingCardGroup('行为', self.scrollWidget)
+        self.screenShotGroup = SettingCardGroup('屏幕快照', self.scrollWidget)
+        self.hotkeyGroup = SettingCardGroup('快捷键', self.scrollWidget)
+        self.advanceGroup = SettingCardGroup('高级', self.scrollWidget)
+        self.aboutGroup = SettingCardGroup('关于', self.scrollWidget)
 
         self.valueCard = SpinBoxSettingCard(
             cfg.Value,
@@ -1498,13 +1681,6 @@ class SettingInterface(SmoothScrollArea):
             "随机数不重复",
             configItem=cfg.NoRepeat,
             parent=self.elementGroup)
-
-
-        self.screenShotGroup = SettingCardGroup('屏幕快照', self.scrollWidget)
-        self.hotkeyGroup = SettingCardGroup('快捷键', self.scrollWidget)
-        self.advanceGroup = SettingCardGroup('高级', self.scrollWidget)
-        self.aboutGroup = SettingCardGroup('关于', self.scrollWidget)
-
         self.colorCard = CustomGradientColorSettingCard(
             cfg.ButtonColorStart,
             cfg.ButtonColorEnd,
@@ -1514,6 +1690,12 @@ class SettingInterface(SmoothScrollArea):
             FluentFontIcon("\ue790"),
             '颜色',
             '更改按钮的颜色主题',
+            parent=self.appearanceGroup)
+        self.fontCard = FontSettingCard(
+            FluentFontIcon("\ue8d2"),
+            '字体',
+            '更改按钮的字体',
+            configItem=cfg.FontFamily,
             parent=self.appearanceGroup)
         self.opacityCard = RangeSettingCard(
             cfg.Opacity,
@@ -1644,6 +1826,7 @@ class SettingInterface(SmoothScrollArea):
         self.elementGroup.addSettingCard(self.noRepeatCard)
 
         self.appearanceGroup.addSettingCard(self.colorCard)
+        self.appearanceGroup.addSettingCard(self.fontCard)
         self.appearanceGroup.addSettingCard(self.opacityCard)
         self.actGroup.addSettingCard(self.autoRunCard)
         self.actGroup.addSettingCard(self.showTimeCard)
@@ -1681,16 +1864,18 @@ class SettingInterface(SmoothScrollArea):
         if w.exec():
             self.valueCard.setValue(40)
             self.noRepeatCard.setValue(True)
-            defaultStart = "#282E3C"
-            defaultEnd = "#000000"
+            defaultStart = "#20612D"
+            defaultEnd = "#143E1D"
             qconfig.set(cfg.ButtonColorStart, defaultStart)
             qconfig.set(cfg.ButtonColorEnd, defaultEnd)
             qconfig.set(cfg.IsCustomColor, False)
-            deepTheme = next((t for t in self.colorCard.BUILT_IN_THEMES if t["name"] == "深邃"), None)
+            deepTheme = next((t for t in self.colorCard.BUILT_IN_THEMES if t["name"] == "神秘森林"), None)
             if deepTheme:
                 self.colorCard.applyTheme(deepTheme)
             else:
                 self.colorCard.applyCustomColors(defaultStart, defaultEnd)
+            qconfig.set(cfg.FontFamily, cfg.FontFamily.defaultValue)
+            self.fontCard.setValue(cfg.FontFamily.defaultValue)
             self.opacityCard.setValue(75)
             self.autoRunCard.setValue(True)
             self.showTimeCard.setValue(True)
@@ -1707,7 +1892,8 @@ class SettingInterface(SmoothScrollArea):
             qconfig.set(cfg.RightMargin, 18)
             self.marginCard.updateValue()
 
-
+            qconfig.set(cfg.ScreenShotPath, cfg.ScreenShotPath.defaultValue)
+            self.screenShotPathCard.setContent(cfg.ScreenShotPath.defaultValue)
 
     def restartThreadFinished(self):
         InfoBar.success(
@@ -1895,6 +2081,55 @@ class WarningBar(QFrame):
 
         rect = self.rect().adjusted(1, 1, -1, -1)
         painter.drawRoundedRect(rect, 6, 6)
+
+
+class WelcomeMessageBox(MessageBoxBase):
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.titleLabel = SubtitleLabel("欢迎使用 Random", self)
+        self.contentLabel = BodyLabel(self)
+        self.contentLabel.setText("\n设置随机总数以继续。")
+        self.contentLabel.setWordWrap(True)
+        self.valueCard = SimpleSpinBoxSettingCard(
+            FluentFontIcon("\ue716"),
+            "人数",
+            "更改随机总数",
+            self.widget,
+            value=cfg.Value.value,
+            minimum=2,
+            maximum=999
+        )
+        self.helpBtn = HyperlinkButton(self)
+        self.helpBtn.setIcon(FluentFontIcon("\uea6b"))
+        self.helpBtn.setText("查看完整帮助")
+        self.helpBtn.clicked.connect(self.onHelpBtn)
+
+        self.contentLayout = QVBoxLayout()
+        self.contentLayout.setContentsMargins(16, 0, 16, 0)
+        self.contentLayout.setSpacing(18)
+        self.contentLayout.addWidget(self.contentLabel)
+        self.contentLayout.addWidget(self.valueCard)
+        self.contentLayout.addWidget(self.helpBtn, alignment=Qt.AlignHCenter)
+
+        self.viewLayout.addWidget(self.titleLabel)
+        self.viewLayout.addLayout(self.contentLayout)
+        self.viewLayout.addStretch()
+
+        self.yesButton.setText("保存")
+        self.cancelButton.setText("跳过")
+
+        self.widget.setMinimumSize(500, 300)
+
+    @property
+    def value(self):
+        return self.valueCard.value
+
+    def onHelpBtn(self):
+        if os.path.exists(os.path.abspath("./Doc/RandomHelp.html")):
+            os.startfile(os.path.abspath("./Doc/RandomHelp.html"))
+        else:
+            QDesktopServices.openUrl(QUrl("https://sudo0015.github.io/post/Random%20-bang-zhu.html"))
 
 
 class CustomMessageBoxBase(MaskDialogBase):
@@ -2236,6 +2471,38 @@ class Main(MSFluentWindow):
         self.navigationInterface.setCurrentItem(self.settingInterface.objectName())
 
         self.splashScreen.finish()
+        QTimer.singleShot(300, self.checkFirstRun)
+
+    def checkFirstRun(self):
+        if not os.path.exists(os.path.join(os.path.expanduser('~'), '.Random', 'config', 'config.json')):
+            w = WelcomeMessageBox(self.window())
+            if w.exec():
+                qconfig.set(cfg.Value, w.value)
+                cfg.save()
+                self._createStartupShortcut()
+
+    def _createStartupShortcut(self):
+        exePath = os.path.abspath("./RandomMain.exe")
+        if not os.path.exists(exePath):
+            return
+
+        startupFolder = os.path.join(
+            os.environ.get('APPDATA', ''),
+            'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup'
+        )
+        shortcutPath = os.path.join(startupFolder, 'RandomMain.lnk')
+
+        psScript = (
+            f"$ws = New-Object -ComObject WScript.Shell; "
+            f"$s = $ws.CreateShortcut('{shortcutPath}'); "
+            f"$s.TargetPath = '{exePath}'; "
+            f"$s.WorkingDirectory = '{os.path.dirname(exePath)}'; "
+            f"$s.Save()"
+        )
+        subprocess.Popen(
+            ['powershell', '-NoProfile', '-Command', psScript],
+            creationflags=subprocess.CREATE_NO_WINDOW
+        )
 
     def onHelpBtn(self):
         os.startfile(os.path.abspath("./Doc/RandomHelp.html"))
