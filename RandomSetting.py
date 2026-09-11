@@ -2,8 +2,11 @@
 
 import os
 import sys
-import subprocess
+import hashlib
+import tempfile
+import requests
 import darkdetect
+import subprocess
 import portalocker
 import RandomResource
 from enum import Enum
@@ -33,6 +36,22 @@ from qfluentwidgets.components.widgets.combo_box import ComboBoxMenu, ComboBox
 from qframelesswindow import TitleBarButton
 from qframelesswindow.utils import startSystemMove
 from qfluentwidgets.components.dialog_box.color_dialog import HuePanel, HexColorLineEdit
+
+
+UPDATE_API_URL = "http://10.181.201.165:1908/api/update"
+
+
+def parse_version(v) -> tuple:
+    parts = str(v).strip().lstrip('vV').split('.')
+    nums = []
+    for p in parts[:3]:
+        try:
+            nums.append(int(p))
+        except ValueError:
+            nums.append(0)
+    while len(nums) < 3:
+        nums.append(0)
+    return tuple(nums)
 
 
 class Mutex:
@@ -1642,6 +1661,77 @@ class RestartTask(QRunnable):
         self.signals.restartFinished.emit(True)
 
 
+class UpdateCheckSignals(QObject):
+    finished = pyqtSignal(dict)
+    failed = pyqtSignal(str)
+
+
+class UpdateCheckTask(QRunnable):
+    def __init__(self, url, signals):
+        super().__init__()
+        self.url = url
+        self.signals = signals
+        self.setAutoDelete(True)
+
+    def run(self):
+        try:
+            r = requests.get(self.url, headers={'User-Agent': 'Random'}, timeout=(5, 10))
+            r.raise_for_status()
+            data = r.json()
+            self.signals.finished.emit(data)
+        except Exception as e:
+            self.signals.failed.emit(str(e))
+
+
+class UpdateDownloadSignals(QObject):
+    finished = pyqtSignal(str)
+    failed = pyqtSignal(str)
+
+
+class UpdateDownloadTask(QRunnable):
+    def __init__(self, url, sha256, version, signals):
+        super().__init__()
+        self.url = url
+        self.sha256 = (sha256 or '').strip().lower()
+        self.version = version
+        self.signals = signals
+        self.setAutoDelete(True)
+
+    def run(self):
+        try:
+            if not self.sha256:
+                self.signals.failed.emit('缺少 sha-256 校验值')
+                return
+
+            filename = f"Random_setup_v{self.version}.exe"
+            path = os.path.join(tempfile.gettempdir(), filename)
+
+            digest = hashlib.sha256()
+            with requests.get(self.url, headers={'User-Agent': 'Random'}, stream=True, timeout=(10, 120)) as r:
+                r.raise_for_status()
+                with open(path, 'wb') as f:
+                    for chunk in r.iter_content(chunk_size=65536):
+                        if chunk:
+                            f.write(chunk)
+                            digest.update(chunk)
+
+            if digest.hexdigest() != self.sha256:
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+                self.signals.failed.emit('校验失败')
+                return
+
+            self.signals.finished.emit(path)
+        except Exception as e:
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+            self.signals.failed.emit(str(e))
+
+
 class SettingInterface(SmoothScrollArea):
 
     def __init__(self, parent=None):
@@ -1793,12 +1883,11 @@ class SettingInterface(SmoothScrollArea):
             '帮助',
             '提示与常见问题',
             self.aboutGroup)
-        self.feedbackCard = PrimaryPushSettingCard(
-            '提供反馈',
-            FluentFontIcon("\ued15"),
-            '反馈',
-            '报告问题或提出建议',
-            self.aboutGroup)
+
+        self._update_url = ""
+        self._update_sha = ""
+        self._update_version = ""
+        self._update_info = ""
 
         self.__initWidget()
 
@@ -1842,7 +1931,6 @@ class SettingInterface(SmoothScrollArea):
         self.advanceGroup.addSettingCard(self.devCard)
         self.aboutGroup.addSettingCard(self.aboutCard)
         self.aboutGroup.addSettingCard(self.helpCard)
-        self.aboutGroup.addSettingCard(self.feedbackCard)
 
         self.expandLayout.setSpacing(28)
         self.expandLayout.setContentsMargins(25, 20, 25, 20)
@@ -1897,8 +1985,8 @@ class SettingInterface(SmoothScrollArea):
 
     def restartThreadFinished(self):
         InfoBar.success(
-            '',
             'Random 已重启',
+            '',
             position=InfoBarPosition.TOP,
             duration=2000,
             isClosable=False,
@@ -1953,9 +2041,8 @@ class SettingInterface(SmoothScrollArea):
         cfg.appRestartSig.connect(self.__showRestartTooltip)
         self.recoverCard.clicked.connect(self.recoverConfig)
         self.devCard.clicked.connect(self.openConfig)
+        self.aboutCard.clicked.connect(self.checkUpdate)
         self.helpCard.clicked.connect(lambda: os.startfile(os.path.abspath("./Doc/RandomHelp.html")))
-        self.feedbackCard.clicked.connect(
-            lambda: QDesktopServices.openUrl(QUrl("https://github.com/sudo0015/Random/issues")))
 
         self.runHotKeyCard.clicked.connect(lambda: self.onHotkeyCardClicked(1))
         self.showHotKeyCard.clicked.connect(lambda: self.onHotkeyCardClicked(2))
@@ -1972,6 +2059,95 @@ class SettingInterface(SmoothScrollArea):
 
         self.screenShotPathCard.setContent(folder)
         cfg.set(cfg.ScreenShotPath, folder)
+
+    def checkUpdate(self):
+        self.aboutCard.button.setEnabled(False)
+        self.aboutCard.button.setText('检查中')
+        signals = UpdateCheckSignals()
+        signals.finished.connect(self.onUpdateCheckFinished)
+        signals.failed.connect(self.onUpdateCheckFailed)
+        task = UpdateCheckTask(UPDATE_API_URL, signals)
+        self.threadPool.start(task)
+
+    def onUpdateCheckFinished(self, data):
+        self.aboutCard.button.setEnabled(True)
+        self.aboutCard.button.setText('检查更新')
+        try:
+            info = data['Random']
+            remote = info['version']
+            url = info['url']
+            sha = info.get('sha-256', '')
+            desc = info.get('info', '')
+        except (KeyError, TypeError, AttributeError):
+            InfoBar.error('检查更新失败', '', position=InfoBarPosition.TOP,
+                          duration=3000, parent=self.window())
+            return
+
+        if parse_version(remote) <= parse_version(VERSION):
+            InfoBar.success('已是最新版本', '', position=InfoBarPosition.TOP,
+                            duration=2000, isClosable=False, parent=self.window())
+            return
+
+        self._update_url = url
+        self._update_sha = sha
+        self._update_version = remote
+        self._update_info = desc
+
+        w = MessageBox(
+            '发现新版本',
+            f'当前版本：{VERSION}\n新版本：v{remote}\n\n{desc}',
+            self.window())
+        w.yesButton.setText('更新')
+        w.cancelButton.setText('取消')
+        if w.exec():
+            self.downloadUpdate()
+
+    def onUpdateCheckFailed(self, err):
+        self.aboutCard.button.setEnabled(True)
+        self.aboutCard.button.setText('检查更新')
+        InfoBar.error('检查更新失败', '', position=InfoBarPosition.TOP,
+                      duration=3000, parent=self.window())
+
+    def downloadUpdate(self):
+        self.aboutCard.button.setEnabled(False)
+        self.aboutCard.button.setText('下载中')
+        InfoBar.info('正在下载更新', '', position=InfoBarPosition.TOP,
+                     duration=2000, isClosable=False, parent=self.window())
+        self._updateDownloadSignals = UpdateDownloadSignals()
+        self._updateDownloadSignals.finished.connect(self.onDownloadFinished)
+        self._updateDownloadSignals.failed.connect(self.onDownloadFailed)
+        task = UpdateDownloadTask(self._update_url, self._update_sha, self._update_version, self._updateDownloadSignals)
+        self.threadPool.start(task)
+
+    def onDownloadFinished(self, path):
+        self._runInstaller(path)
+
+    def onDownloadFailed(self, err):
+        self.aboutCard.button.setEnabled(True)
+        self.aboutCard.button.setText('检查更新')
+        InfoBar.error('更新失败', '', position=InfoBarPosition.TOP,
+                      duration=3000, parent=self.window())
+
+    def _killProcess(self, process_name):
+        for proc in process_iter(['pid', 'name']):
+            try:
+                if proc.info['name'].lower() == process_name.lower():
+                    Process(proc.info['pid']).kill()
+            except:
+                pass
+
+    def _runInstaller(self, path):
+        self._killProcess('RandomMain.exe')
+        self._killProcess('RandomLauncher.exe')
+        ps = (
+            f"Start-Sleep -Seconds 1; "
+            f"Start-Process -FilePath '{path}' -Wait; "
+            f"Remove-Item '{path}'"
+        )
+        subprocess.Popen(
+            ['powershell', '-NoProfile', '-Command', ps],
+            creationflags=subprocess.CREATE_NO_WINDOW)
+        QApplication.instance().quit()
 
 
 class InfoIconWidget(QWidget):

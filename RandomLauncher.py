@@ -3,11 +3,8 @@
 import os
 import sys
 import subprocess
-from typing import Union
-
 import darkdetect
-from qfluentwidgets.components.settings.setting_card import SettingIconWidget
-
+from typing import Union
 from RandomConfig import cfg
 from psutil import process_iter, Process
 from PyQt5.QtGui import QColor, QDesktopServices, QIcon, QPainter
@@ -15,6 +12,7 @@ from PyQt5.QtCore import Qt, pyqtSignal, QUrl
 from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QHBoxLayout, QPushButton, QFrame
 from qfluentwidgets import Dialog, setTheme, Theme, setThemeColor, FluentStyleSheet, TextWrap, PrimaryPushButton, \
     BodyLabel, HyperlinkButton, qconfig, FluentFontIconBase, isDarkTheme, SpinBox
+from qfluentwidgets.components.settings.setting_card import SettingIconWidget
 from qframelesswindow import FramelessDialog
 
 

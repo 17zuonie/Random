@@ -33,6 +33,6 @@ class Config(QConfig):
     FontFamily = ConfigItem("MainWindow", "FontFamily", "JetBrains Mono", ConfigValidator())
 
 
-VERSION = "v5.6.0"
+VERSION = "v5.7.0"
 cfg = Config()
 qconfig.load(os.path.join(os.path.expanduser('~'), '.Random', 'config', 'config.json'), cfg)
