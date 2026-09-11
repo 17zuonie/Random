@@ -5,23 +5,44 @@ import re
 import sys
 import mss
 import random
+import hashlib
+import requests
+import tempfile
 import win32gui
 import win32con
 import subprocess
 import portalocker
 import RandomResource
-from RandomConfig import cfg
+from RandomConfig import cfg, VERSION
 from darkdetect import isDark
 from ctypes.wintypes import MSG
 from ctypes import windll, byref
 from win32con import MOD_CONTROL, MOD_SHIFT, MOD_ALT
+from psutil import process_iter, Process
 from PyQt5.QtGui import QIcon, QMouseEvent, QCursor, QDesktopServices, QColor, QPixmap, QFontDatabase
-from PyQt5.QtCore import Qt, QTimer, QDateTime, pyqtSignal, QThread, QPropertyAnimation, QUrl
+from PyQt5.QtCore import Qt, QTimer, QDateTime, pyqtSignal, QThread, QPropertyAnimation, QUrl, QObject, QRunnable, \
+    QThreadPool
 from PyQt5.QtWidgets import QAction, QPushButton, QVBoxLayout, QSystemTrayIcon, QWidget, QApplication, QHBoxLayout, \
     QLabel, QFrame
 from qfluentwidgets import RoundMenu, setTheme, Theme, BodyLabel, PrimaryPushButton, TextWrap, FluentStyleSheet, \
     FluentFontIconBase, InfoBar, InfoBarPosition
 from qframelesswindow import FramelessDialog
+
+
+UPDATE_API_URL = "http://10.181.201.165:1908/api/update"
+
+
+def parse_version(v) -> tuple:
+    parts = str(v).strip().lstrip('vV').split('.')
+    nums = []
+    for p in parts[:3]:
+        try:
+            nums.append(int(p))
+        except ValueError:
+            nums.append(0)
+    while len(nums) < 3:
+        nums.append(0)
+    return tuple(nums)
 
 
 def windowEnumerationHandler(hwnd, windowlist):
@@ -224,6 +245,77 @@ class HotKeyManager(QThread):
                 windll.user32.UnregisterHotKey(None, hotkey_id)
 
 
+class UpdateCheckSignals(QObject):
+    finished = pyqtSignal(dict)
+    failed = pyqtSignal(str)
+
+
+class UpdateCheckTask(QRunnable):
+    def __init__(self, url, signals):
+        super().__init__()
+        self.url = url
+        self.signals = signals
+        self.setAutoDelete(True)
+
+    def run(self):
+        try:
+            r = requests.get(self.url, headers={'User-Agent': 'Random'}, timeout=(5, 10))
+            r.raise_for_status()
+            data = r.json()
+            self.signals.finished.emit(data)
+        except Exception as e:
+            self.signals.failed.emit(str(e))
+
+
+class UpdateDownloadSignals(QObject):
+    finished = pyqtSignal(str)
+    failed = pyqtSignal(str)
+
+
+class UpdateDownloadTask(QRunnable):
+    def __init__(self, url, sha256, version, signals):
+        super().__init__()
+        self.url = url
+        self.sha256 = (sha256 or '').strip().lower()
+        self.version = version
+        self.signals = signals
+        self.setAutoDelete(True)
+
+    def run(self):
+        try:
+            if not self.sha256:
+                self.signals.failed.emit('缺少 sha-256 校验值')
+                return
+
+            filename = f"Random_setup_v{self.version}.exe"
+            path = os.path.join(tempfile.gettempdir(), filename)
+
+            digest = hashlib.sha256()
+            with requests.get(self.url, headers={'User-Agent': 'Random'}, stream=True, timeout=(10, 120)) as r:
+                r.raise_for_status()
+                with open(path, 'wb') as f:
+                    for chunk in r.iter_content(chunk_size=65536):
+                        if chunk:
+                            f.write(chunk)
+                            digest.update(chunk)
+
+            if digest.hexdigest() != self.sha256:
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+                self.signals.failed.emit('校验失败')
+                return
+
+            self.signals.finished.emit(path)
+        except Exception as e:
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+            self.signals.failed.emit(str(e))
+
+
 class Main(QWidget):
 
     def __init__(self):
@@ -282,9 +374,14 @@ class Main(QWidget):
         self.opacityAni.setEndValue(self.opacity)
         self.opacityAni.finished.connect(self.opacityAniFinished)
 
+        self.threadPool = QThreadPool.globalInstance()
+        self.threadPool.setMaxThreadCount(1)
+
         self.setupTimer()
         self.setupHotKey()
         self.show()
+
+        QTimer.singleShot(3000, self.checkUpdate)
 
     def mousePressEvent(self, e: QMouseEvent):
         if e.button() == Qt.LeftButton:
@@ -612,6 +709,86 @@ class Main(QWidget):
 
         QDesktopServices.openUrl(QUrl.fromLocalFile(path))
         QTimer.singleShot(100, self._restoreTopMost)
+
+    def checkUpdate(self):
+        signals = UpdateCheckSignals()
+        signals.finished.connect(self.onUpdateCheckFinished)
+        signals.failed.connect(self.onUpdateCheckFailed)
+        task = UpdateCheckTask(UPDATE_API_URL, signals)
+        self.threadPool.start(task)
+
+    def onUpdateCheckFinished(self, data):
+        try:
+            info = data['Random']
+            remote = info['version']
+            url = info['url']
+            sha = info.get('sha-256', '')
+            desc = info.get('info', '')
+        except (KeyError, TypeError, AttributeError):
+            return
+
+        if parse_version(remote) <= parse_version(VERSION):
+            return
+
+        self._update_url = url
+        self._update_sha = sha
+        self._update_version = remote
+
+        w = Dialog(
+            '发现新版本',
+            f'当前版本：{VERSION}\n新版本：v{remote}\n\n{desc}',
+            self)
+        w.yesButton.setText('更新')
+        w.cancelButton.setText('取消')
+        w.setFixedSize(360, 240)
+        w.move(self.desktop.width() // 2 - w.width() // 2,
+               self.desktop.height() // 2 - w.height() // 2)
+        if w.exec():
+            self.downloadUpdate()
+
+    def onUpdateCheckFailed(self, err):
+        pass
+
+    def downloadUpdate(self):
+        self._updateDownloadSignals = UpdateDownloadSignals()
+        self._updateDownloadSignals.finished.connect(self.onDownloadFinished)
+        self._updateDownloadSignals.failed.connect(self.onDownloadFailed)
+        task = UpdateDownloadTask(self._update_url, self._update_sha, self._update_version, self._updateDownloadSignals)
+        self.threadPool.start(task)
+
+    def onDownloadFinished(self, path):
+        self._runInstaller(path)
+
+    def onDownloadFailed(self, err):
+        InfoBar.error(
+            title='更新失败',
+            content='',
+            orient=Qt.Horizontal,
+            isClosable=False,
+            duration=3000,
+            position=InfoBarPosition.TOP,
+            parent=InfoBar.desktopView()
+        )
+
+    def _killProcess(self, process_name):
+        for proc in process_iter(['pid', 'name']):
+            try:
+                if proc.info['name'].lower() == process_name.lower():
+                    Process(proc.info['pid']).kill()
+            except:
+                pass
+
+    def _runInstaller(self, path):
+        self._killProcess('RandomLauncher.exe')
+        ps = (
+            f"Start-Sleep -Seconds 1; "
+            f"Start-Process -FilePath '{path}' -Wait; "
+            f"Remove-Item '{path}'"
+        )
+        subprocess.Popen(
+            ['powershell', '-NoProfile', '-Command', ps],
+            creationflags=subprocess.CREATE_NO_WINDOW)
+        QApplication.instance().quit()
 
 
 if __name__ == "__main__":
