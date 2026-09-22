@@ -12,8 +12,8 @@ import RandomResource
 from enum import Enum
 from typing import Union
 from psutil import process_iter, Process
-from RandomConfig import cfg, VERSION
 from pygetwindow import getWindowsWithTitle as GetWindow
+from RandomConfig import cfg, VERSION, DEFAULT_FONT_LABEL
 from PyQt5.QtCore import Qt, pyqtSignal, QRectF, QEasingCurve, QEvent, QTimer, QModelIndex, QObject, QRunnable, QUrl, \
     QThreadPool, QPoint
 from PyQt5.QtGui import QColor, QIcon, QPainter, QPainterPath, QKeySequence, QDesktopServices, QFont, QFontMetrics, \
@@ -401,7 +401,9 @@ class FontMenu(ComboBoxMenu):
             displayName = fontName
 
         label = QLabel(displayName)
-        qss = f"font: {font.pixelSize()}px '{font.family()}'"
+        families = font.families() or [font.family()]
+        familyStr = "', '".join(families)
+        qss = f"font: {font.pixelSize()}px '{familyStr}'"
         label.setStyleSheet(qss)
         label.setFixedHeight(36)
         if labelWidth > 0:
@@ -419,13 +421,15 @@ class FontComboBox(ComboBox):
         self._showPreview = showPreview
         self._fontSize = fontSize
         self._fontCache = []  # [(fontName, QFont, textWidth), ...]
+        base = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
         QFontDatabase.addApplicationFont(
-            os.path.join(os.path.dirname(__file__), "Font", "JetBrainsMono-Regular.ttf"))
+            os.path.join(base, "Font", "JetBrainsMono-Regular.ttf"))
         self._loadFonts()
 
     def _loadFonts(self):
         db = QFontDatabase()
         self.addItems(db.families())
+        self.insertItem(0, DEFAULT_FONT_LABEL)  # “默认”始终位于第一项
         if self._showPreview:
             self._buildFontCache()
 
@@ -433,7 +437,11 @@ class FontComboBox(ComboBox):
         self._fontCache = []
         for i in range(self.count()):
             fontName = self.itemText(i)
-            font = QFont(fontName)
+            if fontName == DEFAULT_FONT_LABEL:
+                font = QFont()
+                font.setFamilies(["Segoe UI", "Microsoft YaHei", "PingFang SC"])  # 与 UI 默认字体一致
+            else:
+                font = QFont(fontName)
             font.setPixelSize(self._fontSize)
             fm = QFontMetrics(font)
             textWidth = fm.horizontalAdvance(fontName)

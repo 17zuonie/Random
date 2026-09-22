@@ -13,12 +13,12 @@ import win32con
 import subprocess
 import portalocker
 import RandomResource
-from RandomConfig import cfg, VERSION
 from darkdetect import isDark
 from ctypes.wintypes import MSG
 from ctypes import windll, byref
-from win32con import MOD_CONTROL, MOD_SHIFT, MOD_ALT
 from psutil import process_iter, Process
+from win32con import MOD_CONTROL, MOD_SHIFT, MOD_ALT
+from RandomConfig import cfg, VERSION, DEFAULT_FONT_FAMILY, DEFAULT_FONT_LABEL
 from PyQt5.QtGui import QIcon, QMouseEvent, QCursor, QDesktopServices, QColor, QPixmap, QFontDatabase
 from PyQt5.QtCore import Qt, QTimer, QDateTime, pyqtSignal, QThread, QPropertyAnimation, QUrl, QObject, QRunnable, \
     QThreadPool
@@ -442,6 +442,8 @@ class Main(QWidget):
         startHex = startColor.name()
         endHex = endColor.name()
 
+        fontFamily = DEFAULT_FONT_FAMILY if cfg.FontFamily.value == DEFAULT_FONT_LABEL else cfg.FontFamily.value
+
         self.button.setStyleSheet(
             f'QPushButton {{'
             f'background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, '
@@ -450,7 +452,7 @@ class Main(QWidget):
             f'border-radius: 16px;'
             f'border: 0.5px groove gray;'
             f'border-style: outset;'
-            f'font-family: "{cfg.FontFamily.value}", "Consolas", "Microsoft YaHei";'
+            f'font-family: "{fontFamily}", "Consolas", "Microsoft YaHei";'
             f'font-size: 15pt;'
             f'font-weight: bold;'
             f'}}'
@@ -802,7 +804,9 @@ if __name__ == "__main__":
             else:
                 setTheme(Theme.LIGHT)
             app = QApplication(sys.argv)
-            QFontDatabase.addApplicationFont("Font/JetBrainsMono-Regular.ttf")
+            base = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
+            QFontDatabase.addApplicationFont(
+                os.path.join(base, "Font", "JetBrainsMono-Regular.ttf"))
             widget = Main()
             widget.show()
             sys.exit(app.exec())

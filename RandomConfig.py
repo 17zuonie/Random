@@ -5,6 +5,10 @@ from qfluentwidgets import qconfig, QConfig, ConfigItem, OptionsConfigItem, Bool
     RangeValidator, OptionsValidator, ConfigValidator
 
 
+DEFAULT_FONT_FAMILY = "JetBrains Mono"
+DEFAULT_FONT_LABEL = "默认"
+
+
 class Config(QConfig):
     Value = RangeConfigItem("MainWindow", "Value", 40, RangeValidator(2, 999))
     NoRepeat = ConfigItem("MainWindow", "NoRepeat", True, BoolValidator())
@@ -30,9 +34,9 @@ class Config(QConfig):
     EnableShowHotKey = ConfigItem("MainWindow", "EnableShowHotKey", True, BoolValidator())
     EnableHideHotKey = ConfigItem("MainWindow", "EnableHideHotKey", True, BoolValidator())
     EnableScreenShotHotKey = ConfigItem("MainWindow", "EnableScreenShotHotKey", True, BoolValidator())
-    FontFamily = ConfigItem("MainWindow", "FontFamily", "JetBrains Mono", ConfigValidator())
+    FontFamily = ConfigItem("MainWindow", "FontFamily", DEFAULT_FONT_LABEL, ConfigValidator())
 
 
-VERSION = "v5.7.0"
+VERSION = "v5.7.1"
 cfg = Config()
 qconfig.load(os.path.join(os.path.expanduser('~'), '.Random', 'config', 'config.json'), cfg)

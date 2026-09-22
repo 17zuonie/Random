@@ -4,16 +4,15 @@
 
 Pipeline (8 steps):
 
-    1. Enter the project virtual environment (.venv)
-    2. Run the 3 hard-coded PyInstaller packaging commands from Debug.bat
+    1. Enter the project virtual environment
+    2. Run the PyInstaller packaging commands
     3. Merge dist/RandomMain, dist/RandomSetting, dist/RandomLauncher
        into release/Random_v<version>
     4. Copy the Font and Doc folders into release/Random_v<version>
     5. Clean up the build folder, the dist folder and every *.spec file
-    6. (Re)generate installer.nsi inside release/Random_v<version> by walking
-       the staging directory, so the installer always contains exactly the
-       files that are staged there
-    7. Build the installer with makensis (NSIS)
+    6. Generate installer.nsi inside release/Random_v<version> by walking
+       the staging directory
+    7. Build the installer with NSIS
     8. Remove the release/Random_v<version> staging directory
 
 The product version is imported from RandomConfig.
@@ -68,6 +67,7 @@ GUARDED_EXECUTABLES = ("RandomLauncher.exe", "RandomMain.exe", "RandomSetting.ex
 PRODUCT_NAME = "Random"
 PRODUCT_PUBLISHER = "Studio SEVENTEEN"
 LAUNCHER_EXE = "RandomLauncher.exe"
+MAIN_EXE = "RandomMain.exe"
 
 MAKENSIS_COMMON_PATHS = (
     r"C:\Program Files (x86)\NSIS\makensis.exe",
@@ -553,10 +553,15 @@ RequestExecutionLevel user
 SetCompressor /SOLID lzma
 SetCompressorDictSize 64
 
+!define MUI_PAGE_CUSTOMFUNCTION_LEAVE LaunchRandomMain
 !insertmacro MUI_PAGE_INSTFILES
-!define MUI_FINISHPAGE_NOAUTOCLOSE
 
 !insertmacro MUI_LANGUAGE "SimpChinese"
+
+Function LaunchRandomMain
+    SetOutPath "$INSTDIR"
+    Exec '"$INSTDIR\{main_exe}"'
+FunctionEnd
 
 Section ""
 
@@ -606,6 +611,7 @@ SectionEnd
         product_name=PRODUCT_NAME,
         publisher=PRODUCT_PUBLISHER,
         launcher_exe=LAUNCHER_EXE,
+        main_exe=MAIN_EXE,
         output_exe=output_exe,
         executable_checks=executable_checks,
         file_count=file_count,
