@@ -37,6 +37,6 @@ class Config(QConfig):
     FontFamily = ConfigItem("MainWindow", "FontFamily", DEFAULT_FONT_LABEL, ConfigValidator())
 
 
-VERSION = "v5.7.1"
+VERSION = "v5.7.2"
 cfg = Config()
 qconfig.load(os.path.join(os.path.expanduser('~'), '.Random', 'config', 'config.json'), cfg)

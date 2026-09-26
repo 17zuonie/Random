@@ -2663,30 +2663,6 @@ class Main(MSFluentWindow):
             if w.exec():
                 qconfig.set(cfg.Value, w.value)
                 cfg.save()
-                self._createStartupShortcut()
-
-    def _createStartupShortcut(self):
-        exePath = os.path.abspath("./RandomMain.exe")
-        if not os.path.exists(exePath):
-            return
-
-        startupFolder = os.path.join(
-            os.environ.get('APPDATA', ''),
-            'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup'
-        )
-        shortcutPath = os.path.join(startupFolder, 'RandomMain.lnk')
-
-        psScript = (
-            f"$ws = New-Object -ComObject WScript.Shell; "
-            f"$s = $ws.CreateShortcut('{shortcutPath}'); "
-            f"$s.TargetPath = '{exePath}'; "
-            f"$s.WorkingDirectory = '{os.path.dirname(exePath)}'; "
-            f"$s.Save()"
-        )
-        subprocess.Popen(
-            ['powershell', '-NoProfile', '-Command', psScript],
-            creationflags=subprocess.CREATE_NO_WINDOW
-        )
 
     def onHelpBtn(self):
         os.startfile(os.path.abspath("./Doc/RandomHelp.html"))

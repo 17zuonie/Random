@@ -68,6 +68,7 @@ PRODUCT_NAME = "Random"
 PRODUCT_PUBLISHER = "Studio SEVENTEEN"
 LAUNCHER_EXE = "RandomLauncher.exe"
 MAIN_EXE = "RandomMain.exe"
+STARTUP_SHORTCUT = "RandomMain.lnk"
 
 MAKENSIS_COMMON_PATHS = (
     r"C:\Program Files (x86)\NSIS\makensis.exe",
@@ -318,7 +319,7 @@ def step_enter_venv(args) -> Path:
 
 
 def step_run_packaging(venv_dir: Path) -> None:
-    LOG.step_start(2, "Run the 3 hard-coded PyInstaller packaging commands")
+    LOG.step_start(2, "Run the hard-coded PyInstaller packaging commands")
 
     env = os.environ.copy()
     env["VIRTUAL_ENV"] = str(venv_dir)
@@ -587,6 +588,9 @@ Section ""
     SetOutPath "$INSTDIR"
     CreateShortCut "$SMPROGRAMS\\{product_name}.lnk" "$INSTDIR\\{launcher_exe}"
     CreateShortCut "$DESKTOP\\{product_name}.lnk" "$INSTDIR\\{launcher_exe}"
+    ; auto run: shortcut in the Startup folder of the current user (shell:startup),
+    ; its working directory is the $OUTDIR set above
+    CreateShortCut "$SMSTARTUP\\{startup_shortcut}" "$INSTDIR\\{main_exe}" "" "$INSTDIR\\{main_exe}" 0
 
 SectionEnd
 
@@ -596,7 +600,7 @@ Section "Uninstall"
 
     Delete "$SMPROGRAMS\\{product_name}.lnk"
     Delete "$DESKTOP\\{product_name}.lnk"
-    Delete "$SMSTARTUP\\RandomMain.lnk"
+    Delete "$SMSTARTUP\\{startup_shortcut}"
     RMDir "$SMPROGRAMS"
 
     RMDir /r /REBOOTOK "$INSTDIR"
@@ -612,6 +616,7 @@ SectionEnd
         publisher=PRODUCT_PUBLISHER,
         launcher_exe=LAUNCHER_EXE,
         main_exe=MAIN_EXE,
+        startup_shortcut=STARTUP_SHORTCUT,
         output_exe=output_exe,
         executable_checks=executable_checks,
         file_count=file_count,
